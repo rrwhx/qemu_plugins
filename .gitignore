@@ -4,5 +4,6 @@ compile_commands.json
 .history/*
 build/*
 *.so
+*.d
 log.txt
 
