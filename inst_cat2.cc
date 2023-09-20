@@ -26,6 +26,8 @@ csh cs_handle;
 enum inst_cat {
     INST_CAT_BEGIN,
     INST_UNKNOW,
+    INST_CAT_PUSH,
+    INST_CAT_POP,
     INST_ARITH, // add, sub
     INST_LOGIC, // and, or, xor
     INST_SHIFT, // sal,sar,shr
@@ -67,6 +69,8 @@ const char* inst_cat_name(int cat) {
     {
 
     case INST_CAT_BEGIN: return "cat_begin";
+    case INST_CAT_PUSH: return "push";
+    case INST_CAT_POP: return "pop";
     case INST_UNKNOW: return "unknow";
     case INST_ARITH: return "arith";
     case INST_LOGIC: return "logic";
@@ -149,6 +153,13 @@ static inline bool x86_insn_has_lock(const cs_insn *insn) {
 
 
 int x86_get_insn_cat(const cs_insn * insn) {
+    switch (insn->id)
+    {
+    case X86_INS_PUSH: return INST_CAT_PUSH;
+    case X86_INS_POP: return INST_CAT_POP;
+    default:
+        return INST_UNKNOW;
+    }
     if (x86_insn_has_lock(insn)) {
         return INST_ATOMIC;
     }
@@ -331,7 +342,7 @@ static void plugin_init(const qemu_info_t *info) {
 void plugin_exit(qemu_plugin_id_t id, void *p)
 {
     char buf[1024];
-    for (int i = 1; i < INST_CAT_END; i++) {
+    for (int i = 1; i <= INST_CAT_POP; i++) {
         sprintf(buf, "%20s,%ld\n", inst_cat_name(i), cat_count[i]);
         qemu_plugin_outs(buf);
     }
