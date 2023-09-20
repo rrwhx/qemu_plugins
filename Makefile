@@ -1,5 +1,5 @@
 QEMU_DIR ?=/home/lxy/qemu
-GLIB_INC ?=`pkg-config --cflags glib-2.0`
+GLIB_INC ?=$(shell pkg-config --cflags glib-2.0)
 CXXFLAGS ?= -g -Wall -std=c++14 -march=native -iquote $(QEMU_DIR)/include/qemu/ $(GLIB_INC) -O2 -std=c++17 -MMD -MP
 #-I/home/lxy/github/capstone/include/
 ifeq ($(wildcard $(QEMU_DIR)),)
