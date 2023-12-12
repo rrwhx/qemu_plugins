@@ -14,7 +14,6 @@
 #include <stdio.h>
 #include <zlib.h>
 #include <vector>
-#include <capstone/capstone.h>
 extern "C" {
 #include "qemu-plugin.h"
 }
