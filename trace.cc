@@ -12,7 +12,9 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
+extern "C" {
 #include "qemu-plugin.h"
+}
 
 QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 
@@ -51,7 +53,7 @@ map<uint64_t, InsnData*> insn_code_data;
 int64_t REAL_INSN_COUNT;
 int64_t TRACE_COUNT = 10000;
 int64_t TRACE_SKIP_COUNT = 10000;
-const char* trace_filename;
+char trace_filename[1024];
 int trace_fd;
 uint64_t filesize;
 qemu_trace_t* trace_buffer;
@@ -69,10 +71,11 @@ static void plugin_init(const qemu_info_t* info) {
         TRACE_SKIP_COUNT = atoll(TRACE_SKIP_COUNT_ENV);
     }
 
-    trace_filename = getenv("TRACE_FILENAME");
-    if (!trace_filename) {
-        trace_filename = "qemu_trace.data";
+    const char* trace_filename_env = getenv("TRACE_FILENAME");
+    if (!trace_filename_env) {
+        trace_filename_env = "qemu_trace.data";
     }
+    snprintf(trace_filename, 1024, "%s.%s", trace_filename_env, info->target_name);
     filesize = TRACE_COUNT * sizeof(qemu_trace_t);
     trace_fd = open(trace_filename, O_RDWR | O_CREAT, (mode_t)0600);
     if (trace_fd < 0) {
