@@ -530,6 +530,18 @@ uint64_t filesize;
 trace_instr_format_t* trace_buffer;
 int64_t trace_buffer_index = -1;
 
+// branch types
+enum branch_type {
+  NOT_BRANCH = 0,
+  BRANCH_DIRECT_JUMP = 1,
+  BRANCH_INDIRECT = 2,
+  BRANCH_CONDITIONAL = 3,
+  BRANCH_DIRECT_CALL = 4,
+  BRANCH_INDIRECT_CALL = 5,
+  BRANCH_RETURN = 6,
+  BRANCH_OTHER = 7
+};
+
 int x64_insn_is_branch(const cs_insn * insn) {
     switch (insn->id)
     {
@@ -554,6 +566,10 @@ int x64_insn_is_branch(const cs_insn * insn) {
 }
 
 int aarch64_insn_is_branch(const cs_insn * insn) {
+    uint32_t code = *(uint32_t*)insn->bytes;
+    if (code >> 26 == 5) {
+        return BRANCH_DIRECT_JUMP;
+    }
     switch (insn->id)
     {
     case ARM64_INS_BC:
@@ -561,16 +577,21 @@ int aarch64_insn_is_branch(const cs_insn * insn) {
     case ARM64_INS_CBZ:
     case ARM64_INS_TBNZ:
     case ARM64_INS_TBZ:
-    case ARM64_INS_B:
+    case ARM64_INS_B://cs bug
+        return BRANCH_CONDITIONAL;
+        // return BRANCH_DIRECT_JUMP;
     case ARM64_INS_BL:
+        return BRANCH_DIRECT_CALL;
     case ARM64_INS_BLR:
+        return BRANCH_INDIRECT_CALL;
     case ARM64_INS_BR:
+        return BRANCH_INDIRECT;
     case ARM64_INS_RET:
-        return 1;
+        return BRANCH_RETURN;
     default:
-        return 0;
+        return NOT_BRANCH;
     }
-    return 0;
+    return NOT_BRANCH;
 }
 
 int riscv64_insn_is_branch(const cs_insn * insn) {
@@ -616,9 +637,13 @@ target_info all_archs[] = {
 
 target_info* target;
 uint64_t imm_count[64];
+bool verbose;
 static void plugin_init(const qemu_info_t* info) {
     fprintf(stderr, "sizeof(trace_instr_format):%zu\n",
             sizeof(trace_instr_format));
+    if (getenv("VERBOSE")) {
+        verbose = true;
+    }
     const char* TRACE_COUNT_ENV = getenv("TRACE_COUNT");
     if (TRACE_COUNT_ENV) {
         TRACE_COUNT = atoll(TRACE_COUNT_ENV);
@@ -634,14 +659,14 @@ static void plugin_init(const qemu_info_t* info) {
         trace_filename = "champsim.trace";
     }
     filesize = TRACE_COUNT * sizeof(trace_instr_format_t);
-    int r = truncate(trace_filename, TRACE_COUNT * sizeof(trace_instr_format_t));
-    if (r < 0) {
+    trace_fd = open(trace_filename, O_RDWR | O_CREAT, (mode_t)0600);
+    if (trace_fd < 0) {
         fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno,
                 strerror(errno), __LINE__);
         exit(EXIT_FAILURE);
     }
-    trace_fd = open(trace_filename, O_RDWR, (mode_t)0600);
-    if (trace_fd < 0) {
+    int r = ftruncate(trace_fd, TRACE_COUNT * sizeof(trace_instr_format_t));
+    if (r < 0) {
         fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno,
                 strerror(errno), __LINE__);
         exit(EXIT_FAILURE);
@@ -691,21 +716,27 @@ void fill_insn_template(trace_instr_format* insn, uint64_t pc,
         cs_err err = cs_regs_access(cs_handle, cs_insn, regs_read, &regs_read_count,
                             regs_write, &regs_write_count);
         if (!err) {
-            if (regs_read_count) {
-                printf("\tRegisters read:");
-                for (i = 0; i < regs_read_count; i++) {
-                    printf(" %s", cs_reg_name(cs_handle, regs_read[i]));
-                }
-                printf("\n");
+            for (i = 0; i < min((int)regs_read_count, NUM_INSTR_SOURCES); i++) {
+                insn->source_registers[i] = regs_read[i];
             }
+            for (i = 0; i < min((int)regs_write_count, NUM_INSTR_DESTINATIONS); i++) {
+                insn->destination_registers[i] = regs_write[i];
+            }
+            // if (regs_read_count) {
+            //     printf("\tRegisters read:");
+            //     for (i = 0; i < regs_read_count; i++) {
+            //         printf(" %s", cs_reg_name(cs_handle, regs_read[i]));
+            //     }
+            //     printf("\n");
+            // }
 
-            if (regs_write_count) {
-                printf("\tRegisters modified:");
-                for (i = 0; i < regs_write_count; i++) {
-                    printf(" %s", cs_reg_name(cs_handle, regs_write[i]));
-                }
-                printf("\n");
-            }
+            // if (regs_write_count) {
+            //     printf("\tRegisters modified:");
+            //     for (i = 0; i < regs_write_count; i++) {
+            //         printf(" %s", cs_reg_name(cs_handle, regs_write[i]));
+            //     }
+            //     printf("\n");
+            // }
         } else {
             fprintf(stderr, "%s\n",  cs_strerror(err));
         }
@@ -740,13 +771,16 @@ void plugin_exit(qemu_plugin_id_t id, void* p) {
                 strerror(errno), __LINE__);
         }
     }
-    fprintf(stderr, "plugin fini, trace ok\n");
+    fprintf(stderr, "plugin fini, trace fini\n");
 }
 
 static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
     ++ REAL_INSN_COUNT;
     if (REAL_INSN_COUNT <= TRACE_SKIP_COUNT) {
         return;
+    }
+    if (REAL_INSN_COUNT == TRACE_SKIP_COUNT + 1) {
+        fprintf(stderr, "trace start\n");
     }
     trace_instr_format* p = (trace_instr_format*)userdata;
     if (trace_buffer_index >= 0 && trace_buffer_index < TRACE_COUNT) {
@@ -756,16 +790,19 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
         } else {
             t->branch_taken = 0;
         }
+        // printf("cpu:%d, las_pc:%lx, size:%d, curr_pc:%lx, branch_taken:%d\n", vcpu_index, t->ip , t->branch_taken , p->ip, t->branch_taken);
     }
     ++ trace_buffer_index;
     if (trace_buffer_index == TRACE_COUNT) {
         msync(trace_buffer, filesize, MS_SYNC);
         munmap(trace_buffer, filesize);
-        fprintf(stderr, "trace ok\n");
+        fprintf(stderr, "trace fini\n");
     } else if (trace_buffer_index < TRACE_COUNT) {
         trace_buffer[trace_buffer_index] = *p;
+        if (verbose) {
+            printf("cpu:%d, pc:%llx, is_branch:%d\n", vcpu_index, p->ip, p->is_branch);
+        }
     }
-    printf("cpu:%d, pc:%llx, is_branch:%d\n", vcpu_index, p->ip, p->is_branch);
 }
 
 static void vcpu_mem_access(unsigned int vcpu_index, qemu_plugin_meminfo_t info,
@@ -791,9 +828,12 @@ static void vcpu_mem_access(unsigned int vcpu_index, qemu_plugin_meminfo_t info,
                 }
             }
         }
+        if (verbose) {
+            printf("cpu:%d, pc:%p, mem_addr:%lx, size:%d, is_st:%d\n", vcpu_index,
+                    userdata, vaddr, 1 << qemu_plugin_mem_size_shift(info), is_st);
+
+        }
     }
-    printf("cpu:%d, pc:%p, mem_addr:%lx, size:%d, is_st:%d\n", vcpu_index,
-            userdata, vaddr, 1 << qemu_plugin_mem_size_shift(info), is_st);
 }
 
 static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb* tb) {
