@@ -639,11 +639,15 @@ target_info all_archs[] = {
 
 target_info* target;
 bool verbose;
+bool early_exit;
 static void plugin_init(const qemu_info_t* info) {
     fprintf(stderr, "sizeof(trace_instr_format):%zu\n",
             sizeof(trace_instr_format));
     if (getenv("VERBOSE")) {
         verbose = true;
+    }
+    if (getenv("EARLY_EXIT")) {
+        early_exit = true;
     }
     const char* TRACE_COUNT_ENV = getenv("TRACE_COUNT");
     if (TRACE_COUNT_ENV) {
@@ -793,6 +797,9 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
         msync(trace_buffer, filesize, MS_SYNC);
         munmap(trace_buffer, filesize);
         fprintf(stderr, "trace fini\n");
+        if (early_exit) {
+            exit(0);
+        }
     } else if (trace_buffer_index < TRACE_COUNT) {
         trace_buffer[trace_buffer_index] = *p;
         if (verbose) {
