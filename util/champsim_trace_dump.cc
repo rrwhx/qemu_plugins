@@ -170,7 +170,7 @@ void dump_trace(trace_instr_format_t& t) {
         }
     }
 
-    reg_str += " <= ";
+    reg_str += "<= ";
     for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
         if (t.source_registers[i]) {
             reg_str += to_string(t.source_registers[i]);
@@ -178,23 +178,27 @@ void dump_trace(trace_instr_format_t& t) {
         }
     }
 
-    fprintf(stderr, "%-28s ", reg_str.c_str());
+    fprintf(stderr, "%-27s ", reg_str.c_str());
 
-    fprintf(stderr, "write memory:");
-    for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
-        if (t.destination_memory[i]) {
-            fprintf(stderr, "%llx ", t.destination_memory[i]);
-        } else {
-            fprintf(stderr, " ");
+    if (t.destination_memory[0]) {
+        fprintf(stderr, "write memory:");
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
+            if (t.destination_memory[i]) {
+                fprintf(stderr, "%llx ", t.destination_memory[i]);
+            } else {
+                fprintf(stderr, " ");
+            }
         }
     }
 
-    fprintf(stderr, "read  memory:");
-    for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
-        if (t.source_memory[i]) {
-            fprintf(stderr, "%llx ", t.source_memory[i]);
-        } else {
-            fprintf(stderr, " ");
+    if (t.source_memory[0]) {
+        fprintf(stderr, "read  memory:");
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
+            if (t.source_memory[i]) {
+                fprintf(stderr, "%llx ", t.source_memory[i]);
+            } else {
+                fprintf(stderr, " ");
+            }
         }
     }
     fprintf(stderr, "\n");
