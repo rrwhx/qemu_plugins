@@ -638,7 +638,6 @@ target_info all_archs[] = {
 };
 
 target_info* target;
-uint64_t imm_count[64];
 bool verbose;
 static void plugin_init(const qemu_info_t* info) {
     fprintf(stderr, "sizeof(trace_instr_format):%zu\n",
@@ -757,11 +756,6 @@ void fill_insn_template(trace_instr_format* insn, uint64_t pc,
 }
 
 void plugin_exit(qemu_plugin_id_t id, void* p) {
-    char buf[1024];
-    for (int i = 1; i < 64; i++) {
-        sprintf(buf, "%3d,%ld\n", i - 32, imm_count[i]);
-        qemu_plugin_outs(buf);
-    }
     cs_close(&cs_handle);
     if (trace_buffer_index < TRACE_COUNT) {
         msync(trace_buffer, filesize, MS_SYNC);
