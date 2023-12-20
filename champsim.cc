@@ -790,7 +790,7 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
         } else {
             t->branch_taken = 0;
         }
-        // printf("cpu:%d, las_pc:%lx, size:%d, curr_pc:%lx, branch_taken:%d\n", vcpu_index, t->ip , t->branch_taken , p->ip, t->branch_taken);
+        // fprintf(stderr, "cpu:%d, las_pc:%lx, size:%d, curr_pc:%lx, branch_taken:%d\n", vcpu_index, t->ip , t->branch_taken , p->ip, t->branch_taken);
     }
     ++ trace_buffer_index;
     if (trace_buffer_index == TRACE_COUNT) {

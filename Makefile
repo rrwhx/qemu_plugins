@@ -17,10 +17,13 @@ $(info $$SOURCES is [${SOURCES}])
 $(info $$OBJS is [${OBJS}])
 $(info $$DEPS is [${DEPS}])
 
+SUBDIRS := util
 
 
+all: $(OBJS) $(SUBDIRS)
 
-all: $(OBJS)
+$(SUBDIRS):
+		$(MAKE) -C $@
 
 $(QEMU_DIR):
 	@echo "Folder $(QEMU_DIR) does not exist"
@@ -34,3 +37,5 @@ $(BUILD_DIR)/lib%.so : %.cc
 
 clean:
 	rm -rf *.o *.so *.d $(BUILD_DIR)
+
+.PHONY: all $(SUBDIRS)
