@@ -19,6 +19,20 @@ extern "C" {
 #include "qemu-plugin.h"
 }
 
+using namespace std;
+
+void xyprintf(const char* format, ...) {
+    char buf[1024];
+    va_list argptr;
+
+    va_start(argptr, format);
+    vsprintf(buf, format, argptr);
+    // snprintf(buf, 1024, format, argptr);
+    // vfprintf(stderr, format, argptr);
+    qemu_plugin_outs(buf);
+    va_end(argptr);
+}
+
 
 QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 csh cs_handle;
@@ -61,8 +75,42 @@ target_info all_archs[] = {
     { NULL }
 };
 
+
+int x86_is_branch(cs_insn* insn) {
+    switch (insn->id)
+    {
+    case X86_INS_JAE:
+    case X86_INS_JA:
+    case X86_INS_JBE:
+    case X86_INS_JB:
+    case X86_INS_JCXZ:
+    case X86_INS_JECXZ:
+    case X86_INS_JE:
+    case X86_INS_JGE:
+    case X86_INS_JG:
+    case X86_INS_JLE:
+    case X86_INS_JL:
+    case X86_INS_JNE:
+    case X86_INS_JNO:
+    case X86_INS_JNP:
+    case X86_INS_JNS:
+    case X86_INS_JO:
+    case X86_INS_JP:
+    case X86_INS_JRCXZ:
+    case X86_INS_JS:
+    case X86_INS_JMP:
+    case X86_INS_CALL:
+    case X86_INS_RET:
+        return 1;
+    default:
+        return 0;
+    }
+    return 0;
+}
+
 target_info* target;
-uint64_t imm_count[64];
+uint64_t imm_count[X86_INS_ENDING][64];
+
 static void plugin_init(const qemu_info_t *info) {
     // printf("%s\n", info->target_name);
     cs_err err;
@@ -83,12 +131,30 @@ static void plugin_init(const qemu_info_t *info) {
 }
 void plugin_exit(qemu_plugin_id_t id, void *p)
 {
-    char buf[1024];
+    xyprintf(",");
     for (int i = 1; i < 64; i++) {
-        sprintf(buf, "%3d,%ld\n", i - 32, imm_count[i]);qemu_plugin_outs(buf);
+        xyprintf("%3d,", i - 32);
+    }
+    xyprintf("\n");
+
+    for (int op = 0; op < X86_INS_ENDING; op++) {
+        int skip = 1;
+        for (int i = 1; i < 64; i++) {
+            if(imm_count[op][i]) {
+                skip = 0;
+            }
+        }
+        if (!skip) {
+            xyprintf("%s,", cs_insn_name(cs_handle, op));
+            for (int i = 1; i < 64; i++) {
+                xyprintf("%ld,", imm_count[op][i]);
+            }
+            xyprintf("\n");
+        }
     }
     cs_close(&cs_handle);
 }
+
 
 static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
 {
@@ -104,19 +170,26 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
         int imm;
         int base;
         if (count > 0) {
-            if (cs_insn->id == X86_INS_AND){
-                if (cs_insn->detail->x86.operands[1].type == X86_OP_IMM) {
-                    imm = cs_insn->detail->x86.operands[1].imm;
-                    if (imm >= 0) {
-                        base = 64 - __builtin_clz(imm);
-                    } else {
-                        imm = -imm;
-                        base = __builtin_clz(imm);
+            for (int i = 0; i < cs_insn->detail->x86.op_count; i++) {
+                if (cs_insn->detail->x86.operands[i].type == X86_OP_IMM) {
+                    imm = cs_insn->detail->x86.operands[i].imm;
+                    if (x86_is_branch(cs_insn)) {
+                        imm = imm - (addr + size);
                     }
-                    qemu_plugin_register_vcpu_tb_exec_inline(tb,QEMU_PLUGIN_INLINE_ADD_U64, (void*)(imm_count + base), 1);
-                    // printf("%16lx: %-15s%s\n", addr, cs_insn->mnemonic, cs_insn->op_str);
+                    if (imm <= INT_MAX && imm >= INT_MIN) {
+                        if (imm >= 0) {
+                            base = 64 - __builtin_clz(imm);
+                        } else {
+                            imm = -imm;
+                            base = __builtin_clz(imm);
+                        }
+                        qemu_plugin_register_vcpu_tb_exec_inline(tb,QEMU_PLUGIN_INLINE_ADD_U64, (void*)(&imm_count[cs_insn->id][base]), 1);
+                        continue;
+                        // printf("%16lx: %-15s%s\n", addr, cs_insn->mnemonic, cs_insn->op_str);
+                    }
                 }
             }
+        
             cs_free(cs_insn, count);
         }
     }
