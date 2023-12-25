@@ -2,7 +2,7 @@ compile_commands.json
 .vscode/*
 .ccls-cache/*
 .history/*
-build/*
+build/
 *.so
 *.d
 log.txt
