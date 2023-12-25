@@ -1,4 +1,4 @@
-QEMU_DIR ?=/home/lxy/qemu
+QEMU_DIR ?=${HOME}/qemu
 GLIB_INC ?=$(shell pkg-config --cflags glib-2.0)
 CXXFLAGS ?= -march=native -g -Wall -std=c++14 -march=native -iquote $(QEMU_DIR)/include/qemu/ $(GLIB_INC) -O2 -std=c++17 -MMD -MP
 #-I/home/lxy/github/capstone/include/
