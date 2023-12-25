@@ -380,7 +380,7 @@ int aarch64_op_is_imm(cs_aarch64_op* op) {
 int aarch64_get_insn_cat(const cs_insn * insn) {
     bool first_op_isgr = false;
     bool first_op_isfr = false;
-    bool second_op_isgr = false;
+    __attribute__((unused)) bool second_op_isgr = false;
     bool second_op_isfr = false;
     if (insn->detail->aarch64.op_count >= 1) {
         first_op_isgr = aarch64_op_is_gr(&insn->detail->aarch64.operands[0]);
