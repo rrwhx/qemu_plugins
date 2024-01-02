@@ -1,0 +1,66 @@
+diff --git a/linux-user/loongarch64/syscall_nr.h b/linux-user/loongarch64/syscall_nr.h
+index be00915adf..52e55576af 100644
+--- a/linux-user/loongarch64/syscall_nr.h
++++ b/linux-user/loongarch64/syscall_nr.h
+@@ -84,6 +84,8 @@
+ #define TARGET_NR_splice 76
+ #define TARGET_NR_tee 77
+ #define TARGET_NR_readlinkat 78
++#define TARGET_NR_newfstatat 79
++#define TARGET_NR_fstat 80
+ #define TARGET_NR_sync 81
+ #define TARGET_NR_fsync 82
+ #define TARGET_NR_fdatasync 83
+@@ -166,6 +168,8 @@
+ #define TARGET_NR_uname 160
+ #define TARGET_NR_sethostname 161
+ #define TARGET_NR_setdomainname 162
++#define TARGET_NR_getrlimit 163
++#define TARGET_NR_setrlimit 164
+ #define TARGET_NR_getrusage 165
+ #define TARGET_NR_umask 166
+ #define TARGET_NR_prctl 167
+diff --git a/linux-user/syscall_defs.h b/linux-user/syscall_defs.h
+index 77ba343c85..f1cc653859 100644
+--- a/linux-user/syscall_defs.h
++++ b/linux-user/syscall_defs.h
+@@ -450,7 +450,7 @@ struct target_dirent64 {
+ #define TARGET_SIG_IGN  ((abi_long)1)   /* ignore signal */
+ #define TARGET_SIG_ERR  ((abi_long)-1)  /* error return from signal */
+ 
+-#ifdef TARGET_MIPS
++#if defined(TARGET_MIPS) || defined(TARGET_LOONGARCH64)
+ #define TARGET_NSIG        128
+ #else
+ #define TARGET_NSIG        64
+@@ -2087,6 +2087,30 @@ struct target_stat64 {
+ 
+ /* LoongArch no newfstatat/fstat syscall. */
+ 
++#define TARGET_STAT_HAVE_NSEC
++struct target_stat {
++    abi_ulong st_dev;
++    abi_ulong st_ino;
++    unsigned int st_mode;
++    unsigned int st_nlink;
++    unsigned int st_uid;
++    unsigned int st_gid;
++    abi_ulong st_rdev;
++    abi_ulong __pad1;
++    abi_long st_size;
++    int st_blksize;
++    int __pad2;
++    abi_long st_blocks;
++    abi_long target_st_atime;
++    abi_ulong target_st_atime_nsec;
++    abi_long target_st_mtime;
++    abi_ulong target_st_mtime_nsec;
++    abi_long target_st_ctime;
++    abi_ulong target_st_ctime_nsec;
++    unsigned int __unused4;
++    unsigned int __unused5;
++};
++
+ #else
+ #error unsupported CPU
+ #endif
