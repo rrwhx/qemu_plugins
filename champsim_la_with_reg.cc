@@ -192,9 +192,12 @@ bool verbose;
 bool early_exit;
 static void plugin_init(const qemu_info_t* info) {
     if (strcmp(info->target_name, "loongarch64")!=0) {
-        fprintf(stderr, "only support qemu-loongarch64:\n");
+        fprintf(stderr, "only support qemu-loongarch64\n");
         exit(0);
     }
+#ifndef QEMU_PLUGIN_HAS_ENV_PTR
+    fprintf(stderr, "your qemu plugin does not support env_ptr, ret_val can not be record\n");
+#endif
     fprintf(stderr, "sizeof(trace_instr_format):%zu\n",
             sizeof(trace_instr_format));
     if (getenv("VERBOSE")) {
@@ -260,7 +263,9 @@ void fill_insn_template(trace_instr_format* insn, uint64_t pc,
         }
     } else {
         if (la_decode.opcnt >= 1 && la_decode.op[0].type == LA_OP_GPR) {
+#ifdef QEMU_PLUGIN_HAS_ENV_PTR
             insn->ret_val = la_decode.op[0].val;
+#endif
             insn->destination_registers[0] = la_decode.op[0].val;
         }
 
@@ -302,8 +307,10 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
         } else {
             t->branch_taken = 0;
         }
+#ifdef QEMU_PLUGIN_HAS_ENV_PTR
         uint64_t* env = (uint64_t*)qemu_plugin_env_ptr();
         t->ret_val = env[t->ret_val];
+#endif
         dump_trace(*t);
         // fprintf(stderr, "cpu:%d, las_pc:%lx, size:%d, curr_pc:%lx, branch_taken:%d\n", vcpu_index, t->ip , t->branch_taken , p->ip, t->branch_taken);
     }
