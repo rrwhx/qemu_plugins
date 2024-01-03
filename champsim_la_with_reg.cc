@@ -89,10 +89,11 @@ void dump_trace(trace_instr_format_t& t) {
         }
     }
 
-    stringstream stream;
-    stream << std::hex << t.ret_val;
-
-    reg_str += "(0x" + stream.str() + ")";
+    if (t.destination_registers[0]) {
+        stringstream stream;
+        stream << std::hex << t.ret_val;
+        reg_str += "(0x" + stream.str() + ")";
+    }
 
     reg_str += " <= ";
     for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
@@ -102,23 +103,27 @@ void dump_trace(trace_instr_format_t& t) {
         }
     }
 
-    fprintf(stderr, "%-28s ", reg_str.c_str());
+    fprintf(stderr, "%-27s ", reg_str.c_str());
 
-    fprintf(stderr, "write memory:");
-    for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
-        if (t.destination_memory[i]) {
-            fprintf(stderr, "%llx ", t.destination_memory[i]);
-        } else {
-            fprintf(stderr, " ");
+    if (t.destination_memory[0]) {
+        fprintf(stderr, "write memory:");
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
+            if (t.destination_memory[i]) {
+                fprintf(stderr, "%llx ", t.destination_memory[i]);
+            } else {
+                fprintf(stderr, " ");
+            }
         }
     }
 
-    fprintf(stderr, "read  memory:");
-    for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
-        if (t.source_memory[i]) {
-            fprintf(stderr, "%llx ", t.source_memory[i]);
-        } else {
-            fprintf(stderr, " ");
+    if (t.source_memory[0]) {
+        fprintf(stderr, "read memory:");
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
+            if (t.source_memory[i]) {
+                fprintf(stderr, "%llx ", t.source_memory[i]);
+            } else {
+                fprintf(stderr, " ");
+            }
         }
     }
     fprintf(stderr, "\n");
@@ -247,32 +252,44 @@ static void plugin_init(const qemu_info_t* info) {
     // printf("%s\n", info->target_name);
 }
 
+int encode_reg(LA_OP op) {
+    if (op.type == LA_OP_GPR) {
+        return op.val;
+    } else if (op.type == LA_OP_FR || op.type == LA_OP_VR || op.type == LA_OP_XR) {
+        return op.val + 32;
+    } else if (op.type == LA_OP_FCC) {
+        return op.val + 64;
+    }
+    return 0;
+}
+
 void fill_insn_template(trace_instr_format* insn, uint64_t pc,
                         const uint8_t* data, int size) {
     insn->ip = pc;
     insn->branch_taken = size;
     insn->inst = *(uint32_t*)data;
     decode(NULL, *(uint32_t*)data);
-    insn->is_branch = la_inst_is_branch(la_decode.id);
+    // char buf[1024];
+    // la_inst_str(&la_decode, buf);
+    // fprintf(stderr, "%s\n", buf);
+    insn->is_branch = la_inst_branch_type(la_decode);
     insn->ret_val = 0;
     if (la_inst_is_branch_not_link(la_decode.id) || la_inst_is_st(la_decode.id)) {
         for (int i = 0; i < min(la_decode.opcnt, NUM_INSTR_SOURCES); i++) {
-            if (la_decode.op[i].type == LA_OP_GPR) {
-                insn->source_registers[i] = la_decode.op[i].val;
-            }
+            insn->source_registers[i] = encode_reg(la_decode.op[i]);
         }
     } else {
         if (la_decode.opcnt >= 1 && la_decode.op[0].type == LA_OP_GPR) {
 #ifdef QEMU_PLUGIN_HAS_ENV_PTR
             insn->ret_val = la_decode.op[0].val;
 #endif
-            insn->destination_registers[0] = la_decode.op[0].val;
+        }
+        if (la_decode.opcnt >= 1) {
+            insn->destination_registers[0] = encode_reg(la_decode.op[0]);
         }
 
         for (int i = 0; i < min(la_decode.opcnt - 1, NUM_INSTR_SOURCES); i++) {
-            if (la_decode.op[i + 1].type == LA_OP_GPR) {
-                insn->source_registers[i] = la_decode.op[i + 1].val;
-            }
+            insn->source_registers[i] = encode_reg(la_decode.op[i + 1]);
         }
     }
 }
@@ -311,7 +328,9 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
         uint64_t* env = (uint64_t*)qemu_plugin_env_ptr();
         t->ret_val = env[t->ret_val];
 #endif
-        dump_trace(*t);
+        if (verbose) {
+            dump_trace(*t);
+        }
         // fprintf(stderr, "cpu:%d, las_pc:%lx, size:%d, curr_pc:%lx, branch_taken:%d\n", vcpu_index, t->ip , t->branch_taken , p->ip, t->branch_taken);
     }
     ++ trace_buffer_index;
@@ -324,9 +343,9 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
         }
     } else if (trace_buffer_index < TRACE_COUNT) {
         trace_buffer[trace_buffer_index] = *p;
-        if (verbose) {
-            printf("cpu:%d, pc:%llx, is_branch:%d\n", vcpu_index, p->ip, p->is_branch);
-        }
+        // if (verbose) {
+        //     printf("cpu:%d, pc:%llx, is_branch:%d\n", vcpu_index, p->ip, p->is_branch);
+        // }
     }
 }
 
@@ -353,11 +372,10 @@ static void vcpu_mem_access(unsigned int vcpu_index, qemu_plugin_meminfo_t info,
                 }
             }
         }
-        if (verbose) {
-            printf("cpu:%d, pc:%p, mem_addr:%lx, size:%d, is_st:%d\n", vcpu_index,
-                    userdata, vaddr, 1 << qemu_plugin_mem_size_shift(info), is_st);
-
-        }
+        // if (verbose) {
+        //     printf("cpu:%d, pc:%p, mem_addr:%lx, size:%d, is_st:%d\n", vcpu_index,
+        //             userdata, vaddr, 1 << qemu_plugin_mem_size_shift(info), is_st);
+        // }
     }
 }
 
