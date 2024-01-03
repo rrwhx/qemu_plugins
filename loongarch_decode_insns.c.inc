@@ -21621,7 +21621,7 @@ static bool la_inst_is_st(int id) {
     return la_inst_is_ist(id) || la_inst_is_fst(id);
 }
 
-static bool la_inst_is_ld(int id) {
+static bool la_inst_is_ild(int id) {
     switch (id) {
         case LA_INST_LD_B:
         case LA_INST_LD_H:
@@ -21652,6 +21652,43 @@ static bool la_inst_is_ld(int id) {
             return false;
     }
     return false;
+}
+
+static bool la_inst_is_fld(int id) {
+    switch (id) {
+        case LA_INST_FLD_S:
+        case LA_INST_FLD_D:
+        case LA_INST_FLDX_S:
+        case LA_INST_FLDX_D:
+        case LA_INST_FLDGT_S:
+        case LA_INST_FLDGT_D:
+        case LA_INST_FLDLE_S:
+        case LA_INST_FLDLE_D:
+        case LA_INST_VLD:
+        case LA_INST_VLDX:
+        case LA_INST_VLDREPL_D:
+        case LA_INST_VLDREPL_W:
+        case LA_INST_VLDREPL_H:
+        case LA_INST_VLDREPL_B:
+        case LA_INST_XVLD:
+        case LA_INST_XVLDX:
+        case LA_INST_XVLDREPL_D:
+        case LA_INST_XVLDREPL_W:
+        case LA_INST_XVLDREPL_H:
+        case LA_INST_XVLDREPL_B:
+            return true;
+        default:
+            return false;
+    }
+    return false;
+}
+
+
+
+
+
+static bool la_inst_is_ld(int id) {
+    return la_inst_is_ild(id) || la_inst_is_fld(id);
 }
 
 static bool la_inst_is_branch(int id) {
