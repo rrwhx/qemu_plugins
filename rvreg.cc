@@ -15,6 +15,9 @@
 #include <zlib.h>
 #include <vector>
 #include <capstone/capstone.h>
+#if CS_NEXT_VERSION < 6
+#error "capstone version mismatch"
+#endif
 extern "C" {
 #include "qemu-plugin.h"
 }
