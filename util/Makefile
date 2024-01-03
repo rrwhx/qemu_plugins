@@ -26,7 +26,7 @@ $(BUILD_DIR)/%: %.cc
 	$(CXX) $(CXXFLAGS) -MMD -o $@ $<
 
 clean:
-	$(RM) $(BINS)
+	$(RM) -rf $(BUILD_DIR)
 
 distclean: clean
 	$(RM) *~ $(DEPS)
