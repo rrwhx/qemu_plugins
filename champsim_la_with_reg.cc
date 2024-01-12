@@ -268,7 +268,8 @@ void fill_insn_template(trace_instr_format* insn, uint64_t pc,
     insn->ip = pc;
     insn->branch_taken = size;
     insn->inst = *(uint32_t*)data;
-    decode(NULL, *(uint32_t*)data);
+    LA_DECODE la_decode;
+    decode(&la_decode, *(uint32_t*)data);
     // char buf[1024];
     // la_inst_str(&la_decode, buf);
     // fprintf(stderr, "%s\n", buf);
