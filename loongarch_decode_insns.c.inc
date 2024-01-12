@@ -4,7 +4,41 @@
 #include <assert.h>
 #include <stdio.h>
 
-#define DisasContext void
+enum LA_OP_TYPE {
+    LA_OP_GPR,
+    LA_OP_FR,
+    LA_OP_VR,
+    LA_OP_XR,
+    LA_OP_FCC,
+    LA_OP_FCSR,
+    LA_OP_CSR,
+    LA_OP_IMM,
+};
+
+const char* la_op_type_name[] = {
+    [LA_OP_GPR] = "r",
+    [LA_OP_FR] = "f",
+    [LA_OP_VR] = "vr",
+    [LA_OP_XR] = "xr",
+    [LA_OP_FCC] = "fcc",
+    [LA_OP_FCSR] = "fcsr",
+    [LA_OP_CSR] = "csr",
+    [LA_OP_IMM] = "",
+};
+
+typedef struct LA_OP {
+    int type;
+    int val;
+}LA_OP;
+
+typedef struct LA_DECODE {
+    int id;
+    int opcnt;
+    LA_OP op[4];
+}LA_DECODE;
+
+
+#define DisasContext LA_DECODE
 
 
 /**
@@ -16171,9 +16205,6 @@ static bool decode(DisasContext *ctx, uint32_t insn)
     return false;
 }
 
-__thread int dst_reg;
-__thread int op;
-
 
 enum {
 LA_INST_BEGIN,
@@ -19565,2001 +19596,1967 @@ const char* la_op_name[] = {
 [LA_INST_END] = "end",
 };
 
-enum LA_OP_TYPE {
-    LA_OP_GPR,
-    LA_OP_FR,
-    LA_OP_VR,
-    LA_OP_XR,
-    LA_OP_FCC,
-    LA_OP_FCSR,
-    LA_OP_CSR,
-    LA_OP_IMM,
-};
 
-const char* la_op_type_name[] = {
-    [LA_OP_GPR] = "r",
-    [LA_OP_FR] = "f",
-    [LA_OP_VR] = "vr",
-    [LA_OP_XR] = "xr",
-    [LA_OP_FCC] = "fcc",
-    [LA_OP_FCSR] = "fcsr",
-    [LA_OP_CSR] = "csr",
-    [LA_OP_IMM] = "",
-};
-
-typedef struct LA_OP {
-    int type;
-    int val;
-}LA_OP;
-
-typedef struct LA_DECODE {
-    int id;
-    int opcnt;
-    LA_OP op[4];
-}LA_DECODE;
-
-__thread LA_DECODE la_decode;
-
-static void handle_arg_c_offs(int id, arg_c_offs* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_FCC; la_decode.op[0].val = a->cj;
-    la_decode.op[1].type = LA_OP_IMM; la_decode.op[1].val = a->offs;
+static void handle_arg_c_offs(LA_DECODE* la_decode, arg_c_offs* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_FCC; la_decode->op[0].val = a->cj;
+    la_decode->op[1].type = LA_OP_IMM; la_decode->op[1].val = a->offs;
 }
-static void handle_arg_cf(int id, arg_cf* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_FCC; la_decode.op[0].val = a->cd;
-    la_decode.op[1].type = LA_OP_FR; la_decode.op[1].val = a->fj;
+static void handle_arg_cf(LA_DECODE* la_decode, arg_cf* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_FCC; la_decode->op[0].val = a->cd;
+    la_decode->op[1].type = LA_OP_FR; la_decode->op[1].val = a->fj;
 }
-static void handle_arg_cff_fcond(int id, arg_cff_fcond* a) {
-    la_decode.id = id; la_decode.opcnt = 4;
-    la_decode.op[0].type = LA_OP_FCC; la_decode.op[0].val = a->cd;
-    la_decode.op[1].type = LA_OP_FR; la_decode.op[1].val = a->fj;
-    la_decode.op[2].type = LA_OP_FR; la_decode.op[2].val = a->fk;
-    la_decode.op[3].type = LA_OP_IMM; la_decode.op[3].val = a->fcond;
+static void handle_arg_cff_fcond(LA_DECODE* la_decode, arg_cff_fcond* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 4;
+    la_decode->op[0].type = LA_OP_FCC; la_decode->op[0].val = a->cd;
+    la_decode->op[1].type = LA_OP_FR; la_decode->op[1].val = a->fj;
+    la_decode->op[2].type = LA_OP_FR; la_decode->op[2].val = a->fk;
+    la_decode->op[3].type = LA_OP_IMM; la_decode->op[3].val = a->fcond;
 }
-static void handle_arg_cop_r_i(int id, arg_cop_r_i* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_IMM; la_decode.op[0].val = a->cop;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_IMM; la_decode.op[2].val = a->imm;
+static void handle_arg_cop_r_i(LA_DECODE* la_decode, arg_cop_r_i* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_IMM; la_decode->op[0].val = a->cop;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_IMM; la_decode->op[2].val = a->imm;
 }
-static void handle_arg_cr(int id, arg_cr* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_FCC; la_decode.op[0].val = a->cd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
+static void handle_arg_cr(LA_DECODE* la_decode, arg_cr* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_FCC; la_decode->op[0].val = a->cd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
 }
-static void handle_arg_cv(int id, arg_cv* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_FCC; la_decode.op[0].val = a->cd;
-    la_decode.op[1].type = LA_OP_VR; la_decode.op[1].val = a->vj;
+static void handle_arg_cv(LA_DECODE* la_decode, arg_cv* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_FCC; la_decode->op[0].val = a->cd;
+    la_decode->op[1].type = LA_OP_VR; la_decode->op[1].val = a->vj;
 }
-static void handle_arg_empty(int id, arg_empty* a) {
-    la_decode.id = id; la_decode.opcnt = 0;
+static void handle_arg_empty(LA_DECODE* la_decode, arg_empty* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 0;
 }
-static void handle_arg_fc(int id, arg_fc* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_FR; la_decode.op[0].val = a->fd;
-    la_decode.op[1].type = LA_OP_FCC; la_decode.op[1].val = a->cj;
+static void handle_arg_fc(LA_DECODE* la_decode, arg_fc* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_FR; la_decode->op[0].val = a->fd;
+    la_decode->op[1].type = LA_OP_FCC; la_decode->op[1].val = a->cj;
 }
-static void handle_arg_fcsrd_r(int id, arg_fcsrd_r* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_FCSR; la_decode.op[0].val = a->fcsrd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
+static void handle_arg_fcsrd_r(LA_DECODE* la_decode, arg_fcsrd_r* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_FCSR; la_decode->op[0].val = a->fcsrd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
 }
-static void handle_arg_ff(int id, arg_ff* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_FR; la_decode.op[0].val = a->fd;
-    la_decode.op[1].type = LA_OP_FR; la_decode.op[1].val = a->fj;
+static void handle_arg_ff(LA_DECODE* la_decode, arg_ff* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_FR; la_decode->op[0].val = a->fd;
+    la_decode->op[1].type = LA_OP_FR; la_decode->op[1].val = a->fj;
 }
-static void handle_arg_fff(int id, arg_fff* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_FR; la_decode.op[0].val = a->fd;
-    la_decode.op[1].type = LA_OP_FR; la_decode.op[1].val = a->fj;
-    la_decode.op[2].type = LA_OP_FR; la_decode.op[2].val = a->fk;
+static void handle_arg_fff(LA_DECODE* la_decode, arg_fff* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_FR; la_decode->op[0].val = a->fd;
+    la_decode->op[1].type = LA_OP_FR; la_decode->op[1].val = a->fj;
+    la_decode->op[2].type = LA_OP_FR; la_decode->op[2].val = a->fk;
 }
-static void handle_arg_fffc(int id, arg_fffc* a) {
-    la_decode.id = id; la_decode.opcnt = 4;
-    la_decode.op[0].type = LA_OP_FR; la_decode.op[0].val = a->fd;
-    la_decode.op[1].type = LA_OP_FR; la_decode.op[1].val = a->fj;
-    la_decode.op[2].type = LA_OP_FR; la_decode.op[2].val = a->fk;
-    la_decode.op[2].type = LA_OP_FCC; la_decode.op[2].val = a->ca;
+static void handle_arg_fffc(LA_DECODE* la_decode, arg_fffc* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 4;
+    la_decode->op[0].type = LA_OP_FR; la_decode->op[0].val = a->fd;
+    la_decode->op[1].type = LA_OP_FR; la_decode->op[1].val = a->fj;
+    la_decode->op[2].type = LA_OP_FR; la_decode->op[2].val = a->fk;
+    la_decode->op[2].type = LA_OP_FCC; la_decode->op[2].val = a->ca;
 }
-static void handle_arg_ffff(int id, arg_ffff* a) {
-    la_decode.id = id; la_decode.opcnt = 4;
-    la_decode.op[0].type = LA_OP_FR; la_decode.op[0].val = a->fd;
-    la_decode.op[1].type = LA_OP_FR; la_decode.op[1].val = a->fj;
-    la_decode.op[2].type = LA_OP_FR; la_decode.op[2].val = a->fk;
-    la_decode.op[3].type = LA_OP_FR; la_decode.op[3].val = a->fa;
+static void handle_arg_ffff(LA_DECODE* la_decode, arg_ffff* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 4;
+    la_decode->op[0].type = LA_OP_FR; la_decode->op[0].val = a->fd;
+    la_decode->op[1].type = LA_OP_FR; la_decode->op[1].val = a->fj;
+    la_decode->op[2].type = LA_OP_FR; la_decode->op[2].val = a->fk;
+    la_decode->op[3].type = LA_OP_FR; la_decode->op[3].val = a->fa;
 }
-static void handle_arg_fr(int id, arg_fr* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_FR; la_decode.op[0].val = a->fd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
+static void handle_arg_fr(LA_DECODE* la_decode, arg_fr* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_FR; la_decode->op[0].val = a->fd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
 }
-static void handle_arg_fr_i(int id, arg_fr_i* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_FR; la_decode.op[0].val = a->fd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_IMM; la_decode.op[2].val = a->imm;
+static void handle_arg_fr_i(LA_DECODE* la_decode, arg_fr_i* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_FR; la_decode->op[0].val = a->fd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_IMM; la_decode->op[2].val = a->imm;
 }
-static void handle_arg_frr(int id, arg_frr* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_FR; la_decode.op[0].val = a->fd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_GPR; la_decode.op[2].val = a->rk;
+static void handle_arg_frr(LA_DECODE* la_decode, arg_frr* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_FR; la_decode->op[0].val = a->fd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_GPR; la_decode->op[2].val = a->rk;
 }
-static void handle_arg_hint_r_i(int id, arg_hint_r_i* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_IMM; la_decode.op[0].val = a->hint;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_IMM; la_decode.op[2].val = a->imm;
+static void handle_arg_hint_r_i(LA_DECODE* la_decode, arg_hint_r_i* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_IMM; la_decode->op[0].val = a->hint;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_IMM; la_decode->op[2].val = a->imm;
 }
-static void handle_arg_hint_rr(int id, arg_hint_rr* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_IMM; la_decode.op[0].val = a->hint;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_GPR; la_decode.op[2].val = a->rk;
+static void handle_arg_hint_rr(LA_DECODE* la_decode, arg_hint_rr* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_IMM; la_decode->op[0].val = a->hint;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_GPR; la_decode->op[2].val = a->rk;
 }
-static void handle_arg_i(int id, arg_i* a) {
-    la_decode.id = id; la_decode.opcnt = 1;
-    la_decode.op[0].type = LA_OP_IMM; la_decode.op[0].val = a->imm;
+static void handle_arg_i(LA_DECODE* la_decode, arg_i* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 1;
+    la_decode->op[0].type = LA_OP_IMM; la_decode->op[0].val = a->imm;
 }
-static void handle_arg_i_rr(int id, arg_i_rr* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_IMM; la_decode.op[0].val = a->imm;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_GPR; la_decode.op[2].val = a->rk;
+static void handle_arg_i_rr(LA_DECODE* la_decode, arg_i_rr* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_IMM; la_decode->op[0].val = a->imm;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_GPR; la_decode->op[2].val = a->rk;
 }
-static void handle_arg_j_i(int id, arg_j_i* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rj;
-    la_decode.op[1].type = LA_OP_IMM; la_decode.op[1].val = a->imm;
+static void handle_arg_j_i(LA_DECODE* la_decode, arg_j_i* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rj;
+    la_decode->op[1].type = LA_OP_IMM; la_decode->op[1].val = a->imm;
 }
-static void handle_arg_offs(int id, arg_offs* a) {
-    la_decode.id = id; la_decode.opcnt = 1;
-    la_decode.op[0].type = LA_OP_IMM; la_decode.op[0].val = a->offs;
+static void handle_arg_offs(LA_DECODE* la_decode, arg_offs* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 1;
+    la_decode->op[0].type = LA_OP_IMM; la_decode->op[0].val = a->offs;
 }
-static void handle_arg_r_csr(int id, arg_r_csr* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rd;
-    la_decode.op[1].type = LA_OP_CSR; la_decode.op[1].val = a->csr;
+static void handle_arg_r_csr(LA_DECODE* la_decode, arg_r_csr* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rd;
+    la_decode->op[1].type = LA_OP_CSR; la_decode->op[1].val = a->csr;
 }
-static void handle_arg_r_fcsrs(int id, arg_r_fcsrs* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rd;
-    la_decode.op[1].type = LA_OP_FCSR; la_decode.op[1].val = a->fcsrs;
+static void handle_arg_r_fcsrs(LA_DECODE* la_decode, arg_r_fcsrs* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rd;
+    la_decode->op[1].type = LA_OP_FCSR; la_decode->op[1].val = a->fcsrs;
 }
-static void handle_arg_r_i(int id, arg_r_i* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rd;
-    la_decode.op[1].type = LA_OP_IMM; la_decode.op[1].val = a->imm;
+static void handle_arg_r_i(LA_DECODE* la_decode, arg_r_i* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rd;
+    la_decode->op[1].type = LA_OP_IMM; la_decode->op[1].val = a->imm;
 }
-static void handle_arg_r_offs(int id, arg_r_offs* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rj;
-    la_decode.op[1].type = LA_OP_IMM; la_decode.op[1].val = a->offs;
+static void handle_arg_r_offs(LA_DECODE* la_decode, arg_r_offs* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rj;
+    la_decode->op[1].type = LA_OP_IMM; la_decode->op[1].val = a->offs;
 }
-static void handle_arg_rc(int id, arg_rc* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rd;
-    la_decode.op[1].type = LA_OP_FCC; la_decode.op[1].val = a->cj;
+static void handle_arg_rc(LA_DECODE* la_decode, arg_rc* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rd;
+    la_decode->op[1].type = LA_OP_FCC; la_decode->op[1].val = a->cj;
 }
-static void handle_arg_rf(int id, arg_rf* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rd;
-    la_decode.op[1].type = LA_OP_FR; la_decode.op[1].val = a->fj;
+static void handle_arg_rf(LA_DECODE* la_decode, arg_rf* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rd;
+    la_decode->op[1].type = LA_OP_FR; la_decode->op[1].val = a->fj;
 }
-static void handle_arg_rr(int id, arg_rr* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
+static void handle_arg_rr(LA_DECODE* la_decode, arg_rr* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
 }
-static void handle_arg_rr_csr(int id, arg_rr_csr* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_CSR; la_decode.op[2].val = a->csr;
+static void handle_arg_rr_csr(LA_DECODE* la_decode, arg_rr_csr* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_CSR; la_decode->op[2].val = a->csr;
 }
-static void handle_arg_rr_i(int id, arg_rr_i* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_IMM; la_decode.op[2].val = a->imm;
+static void handle_arg_rr_i(LA_DECODE* la_decode, arg_rr_i* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_IMM; la_decode->op[2].val = a->imm;
 }
-static void handle_arg_rr_jk(int id, arg_rr_jk* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rj;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rk;
+static void handle_arg_rr_jk(LA_DECODE* la_decode, arg_rr_jk* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rj;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rk;
 }
-static void handle_arg_rr_ms_ls(int id, arg_rr_ms_ls* a) {
-    la_decode.id = id; la_decode.opcnt = 4;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_IMM; la_decode.op[2].val = a->ms;
-    la_decode.op[3].type = LA_OP_IMM; la_decode.op[3].val = a->ls;
+static void handle_arg_rr_ms_ls(LA_DECODE* la_decode, arg_rr_ms_ls* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 4;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_IMM; la_decode->op[2].val = a->ms;
+    la_decode->op[3].type = LA_OP_IMM; la_decode->op[3].val = a->ls;
 }
-static void handle_arg_rr_offs(int id, arg_rr_offs* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_IMM; la_decode.op[2].val = a->offs;
+static void handle_arg_rr_offs(LA_DECODE* la_decode, arg_rr_offs* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_IMM; la_decode->op[2].val = a->offs;
 }
-static void handle_arg_rrr(int id, arg_rrr* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_GPR; la_decode.op[2].val = a->rk;
+static void handle_arg_rrr(LA_DECODE* la_decode, arg_rrr* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_GPR; la_decode->op[2].val = a->rk;
 }
-static void handle_arg_rrr_sa(int id, arg_rrr_sa* a) {
-    la_decode.id = id; la_decode.opcnt = 4;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_GPR; la_decode.op[2].val = a->rk;
-    la_decode.op[3].type = LA_OP_IMM; la_decode.op[3].val = a->sa;
+static void handle_arg_rrr_sa(LA_DECODE* la_decode, arg_rrr_sa* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 4;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_GPR; la_decode->op[2].val = a->rk;
+    la_decode->op[3].type = LA_OP_IMM; la_decode->op[3].val = a->sa;
 }
-static void handle_arg_rv_i(int id, arg_rv_i* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_GPR; la_decode.op[0].val = a->rd;
-    la_decode.op[1].type = LA_OP_VR; la_decode.op[1].val = a->vj;
-    la_decode.op[2].type = LA_OP_IMM; la_decode.op[2].val = a->imm;
+static void handle_arg_rv_i(LA_DECODE* la_decode, arg_rv_i* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_GPR; la_decode->op[0].val = a->rd;
+    la_decode->op[1].type = LA_OP_VR; la_decode->op[1].val = a->vj;
+    la_decode->op[2].type = LA_OP_IMM; la_decode->op[2].val = a->imm;
 }
-static void handle_arg_v_i(int id, arg_v_i* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_VR; la_decode.op[0].val = a->vd;
-    la_decode.op[1].type = LA_OP_IMM; la_decode.op[1].val = a->imm;
+static void handle_arg_v_i(LA_DECODE* la_decode, arg_v_i* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_VR; la_decode->op[0].val = a->vd;
+    la_decode->op[1].type = LA_OP_IMM; la_decode->op[1].val = a->imm;
 }
-static void handle_arg_vr(int id, arg_vr* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_VR; la_decode.op[0].val = a->vd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
+static void handle_arg_vr(LA_DECODE* la_decode, arg_vr* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_VR; la_decode->op[0].val = a->vd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
 }
-static void handle_arg_vr_i(int id, arg_vr_i* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_VR; la_decode.op[0].val = a->vd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_IMM; la_decode.op[2].val = a->imm;
+static void handle_arg_vr_i(LA_DECODE* la_decode, arg_vr_i* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_VR; la_decode->op[0].val = a->vd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_IMM; la_decode->op[2].val = a->imm;
 }
-static void handle_arg_vr_ii(int id, arg_vr_ii* a) {
-    la_decode.id = id; la_decode.opcnt = 4;
-    la_decode.op[0].type = LA_OP_VR; la_decode.op[0].val = a->vd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_IMM; la_decode.op[2].val = a->imm;
-    la_decode.op[3].type = LA_OP_IMM; la_decode.op[3].val = a->imm2;
+static void handle_arg_vr_ii(LA_DECODE* la_decode, arg_vr_ii* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 4;
+    la_decode->op[0].type = LA_OP_VR; la_decode->op[0].val = a->vd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_IMM; la_decode->op[2].val = a->imm;
+    la_decode->op[3].type = LA_OP_IMM; la_decode->op[3].val = a->imm2;
 }
-static void handle_arg_vrr(int id, arg_vrr* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_VR; la_decode.op[0].val = a->vd;
-    la_decode.op[1].type = LA_OP_GPR; la_decode.op[1].val = a->rj;
-    la_decode.op[2].type = LA_OP_GPR; la_decode.op[2].val = a->rk;
+static void handle_arg_vrr(LA_DECODE* la_decode, arg_vrr* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_VR; la_decode->op[0].val = a->vd;
+    la_decode->op[1].type = LA_OP_GPR; la_decode->op[1].val = a->rj;
+    la_decode->op[2].type = LA_OP_GPR; la_decode->op[2].val = a->rk;
 }
-static void handle_arg_vv(int id, arg_vv* a) {
-    la_decode.id = id; la_decode.opcnt = 2;
-    la_decode.op[0].type = LA_OP_VR; la_decode.op[0].val = a->vd;
-    la_decode.op[1].type = LA_OP_VR; la_decode.op[1].val = a->vj;
+static void handle_arg_vv(LA_DECODE* la_decode, arg_vv* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 2;
+    la_decode->op[0].type = LA_OP_VR; la_decode->op[0].val = a->vd;
+    la_decode->op[1].type = LA_OP_VR; la_decode->op[1].val = a->vj;
 }
-static void handle_arg_vv_i(int id, arg_vv_i* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_VR; la_decode.op[0].val = a->vd;
-    la_decode.op[1].type = LA_OP_VR; la_decode.op[1].val = a->vj;
-    la_decode.op[2].type = LA_OP_IMM; la_decode.op[2].val = a->imm;
+static void handle_arg_vv_i(LA_DECODE* la_decode, arg_vv_i* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_VR; la_decode->op[0].val = a->vd;
+    la_decode->op[1].type = LA_OP_VR; la_decode->op[1].val = a->vj;
+    la_decode->op[2].type = LA_OP_IMM; la_decode->op[2].val = a->imm;
 }
-static void handle_arg_vvr(int id, arg_vvr* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_VR; la_decode.op[0].val = a->vd;
-    la_decode.op[1].type = LA_OP_VR; la_decode.op[1].val = a->vj;
-    la_decode.op[2].type = LA_OP_GPR; la_decode.op[2].val = a->rk;
+static void handle_arg_vvr(LA_DECODE* la_decode, arg_vvr* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_VR; la_decode->op[0].val = a->vd;
+    la_decode->op[1].type = LA_OP_VR; la_decode->op[1].val = a->vj;
+    la_decode->op[2].type = LA_OP_GPR; la_decode->op[2].val = a->rk;
 }
-static void handle_arg_vvv(int id, arg_vvv* a) {
-    la_decode.id = id; la_decode.opcnt = 3;
-    la_decode.op[0].type = LA_OP_VR; la_decode.op[0].val = a->vd;
-    la_decode.op[1].type = LA_OP_VR; la_decode.op[1].val = a->vj;
-    la_decode.op[2].type = LA_OP_VR; la_decode.op[2].val = a->vk;
+static void handle_arg_vvv(LA_DECODE* la_decode, arg_vvv* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 3;
+    la_decode->op[0].type = LA_OP_VR; la_decode->op[0].val = a->vd;
+    la_decode->op[1].type = LA_OP_VR; la_decode->op[1].val = a->vj;
+    la_decode->op[2].type = LA_OP_VR; la_decode->op[2].val = a->vk;
 }
-static void handle_arg_vvv_fcond(int id, arg_vvv_fcond* a) {
-    la_decode.id = id; la_decode.opcnt = 4;
-    la_decode.op[0].type = LA_OP_VR; la_decode.op[0].val = a->vd;
-    la_decode.op[1].type = LA_OP_VR; la_decode.op[1].val = a->vj;
-    la_decode.op[2].type = LA_OP_VR; la_decode.op[2].val = a->vk;
-    la_decode.op[3].type = LA_OP_IMM; la_decode.op[3].val = a->fcond;
+static void handle_arg_vvv_fcond(LA_DECODE* la_decode, arg_vvv_fcond* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 4;
+    la_decode->op[0].type = LA_OP_VR; la_decode->op[0].val = a->vd;
+    la_decode->op[1].type = LA_OP_VR; la_decode->op[1].val = a->vj;
+    la_decode->op[2].type = LA_OP_VR; la_decode->op[2].val = a->vk;
+    la_decode->op[3].type = LA_OP_IMM; la_decode->op[3].val = a->fcond;
 }
-static void handle_arg_vvvv(int id, arg_vvvv* a) {
-    la_decode.id = id; la_decode.opcnt = 4;
-    la_decode.op[0].type = LA_OP_VR; la_decode.op[0].val = a->vd;
-    la_decode.op[1].type = LA_OP_VR; la_decode.op[1].val = a->vj;
-    la_decode.op[2].type = LA_OP_VR; la_decode.op[2].val = a->vk;
-    la_decode.op[3].type = LA_OP_VR; la_decode.op[3].val = a->va;
+static void handle_arg_vvvv(LA_DECODE* la_decode, arg_vvvv* a, int id) {
+    la_decode->id = id; la_decode->opcnt = 4;
+    la_decode->op[0].type = LA_OP_VR; la_decode->op[0].val = a->vd;
+    la_decode->op[1].type = LA_OP_VR; la_decode->op[1].val = a->vj;
+    la_decode->op[2].type = LA_OP_VR; la_decode->op[2].val = a->vk;
+    la_decode->op[3].type = LA_OP_VR; la_decode->op[3].val = a->va;
 }
 
-static bool trans_add_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_ADD_W, a); return true;}
-static bool trans_add_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_ADD_D, a); return true;}
-static bool trans_sub_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_SUB_W, a); return true;}
-static bool trans_sub_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_SUB_D, a); return true;}
-static bool trans_slt(DisasContext *ctx, arg_rrr *a)                 {handle_arg_rrr(LA_INST_SLT, a); return true;}
-static bool trans_sltu(DisasContext *ctx, arg_rrr *a)                {handle_arg_rrr(LA_INST_SLTU, a); return true;}
-static bool trans_slti(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_SLTI, a); return true;}
-static bool trans_sltui(DisasContext *ctx, arg_rr_i *a)              {handle_arg_rr_i(LA_INST_SLTUI, a); return true;}
-static bool trans_nor(DisasContext *ctx, arg_rrr *a)                 {handle_arg_rrr(LA_INST_NOR, a); return true;}
-static bool trans_and(DisasContext *ctx, arg_rrr *a)                 {handle_arg_rrr(LA_INST_AND, a); return true;}
-static bool trans_or(DisasContext *ctx, arg_rrr *a)                  {handle_arg_rrr(LA_INST_OR, a); return true;}
-static bool trans_xor(DisasContext *ctx, arg_rrr *a)                 {handle_arg_rrr(LA_INST_XOR, a); return true;}
-static bool trans_orn(DisasContext *ctx, arg_rrr *a)                 {handle_arg_rrr(LA_INST_ORN, a); return true;}
-static bool trans_andn(DisasContext *ctx, arg_rrr *a)                {handle_arg_rrr(LA_INST_ANDN, a); return true;}
-static bool trans_mul_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_MUL_W, a); return true;}
-static bool trans_mulh_w(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_MULH_W, a); return true;}
-static bool trans_mulh_wu(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(LA_INST_MULH_WU, a); return true;}
-static bool trans_mul_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_MUL_D, a); return true;}
-static bool trans_mulh_d(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_MULH_D, a); return true;}
-static bool trans_mulh_du(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(LA_INST_MULH_DU, a); return true;}
-static bool trans_mulw_d_w(DisasContext *ctx, arg_rrr *a)            {handle_arg_rrr(LA_INST_MULW_D_W, a); return true;}
-static bool trans_mulw_d_wu(DisasContext *ctx, arg_rrr *a)           {handle_arg_rrr(LA_INST_MULW_D_WU, a); return true;}
-static bool trans_div_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_DIV_W, a); return true;}
-static bool trans_mod_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_MOD_W, a); return true;}
-static bool trans_div_wu(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_DIV_WU, a); return true;}
-static bool trans_mod_wu(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_MOD_WU, a); return true;}
-static bool trans_div_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_DIV_D, a); return true;}
-static bool trans_mod_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_MOD_D, a); return true;}
-static bool trans_div_du(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_DIV_DU, a); return true;}
-static bool trans_mod_du(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_MOD_DU, a); return true;}
-static bool trans_alsl_w(DisasContext *ctx, arg_rrr_sa *a)           {handle_arg_rrr_sa(LA_INST_ALSL_W, a); return true;}
-static bool trans_alsl_wu(DisasContext *ctx, arg_rrr_sa *a)          {handle_arg_rrr_sa(LA_INST_ALSL_WU, a); return true;}
-static bool trans_alsl_d(DisasContext *ctx, arg_rrr_sa *a)           {handle_arg_rrr_sa(LA_INST_ALSL_D, a); return true;}
-static bool trans_lu12i_w(DisasContext *ctx, arg_r_i *a)             {handle_arg_r_i(LA_INST_LU12I_W, a); return true;}
-static bool trans_lu32i_d(DisasContext *ctx, arg_r_i *a)             {handle_arg_r_i(LA_INST_LU32I_D, a); return true;}
-static bool trans_lu52i_d(DisasContext *ctx, arg_rr_i *a)            {handle_arg_rr_i(LA_INST_LU52I_D, a); return true;}
-static bool trans_pcaddi(DisasContext *ctx, arg_r_i *a)              {handle_arg_r_i(LA_INST_PCADDI, a); return true;}
-static bool trans_pcalau12i(DisasContext *ctx, arg_r_i *a)           {handle_arg_r_i(LA_INST_PCALAU12I, a); return true;}
-static bool trans_pcaddu12i(DisasContext *ctx, arg_r_i *a)           {handle_arg_r_i(LA_INST_PCADDU12I, a); return true;}
-static bool trans_pcaddu18i(DisasContext *ctx, arg_r_i *a)           {handle_arg_r_i(LA_INST_PCADDU18I, a); return true;}
-static bool trans_addi_w(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(LA_INST_ADDI_W, a); return true;}
-static bool trans_addi_d(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(LA_INST_ADDI_D, a); return true;}
-static bool trans_addu16i_d(DisasContext *ctx, arg_rr_i *a)          {handle_arg_rr_i(LA_INST_ADDU16I_D, a); return true;}
-static bool trans_andi(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_ANDI, a); return true;}
-static bool trans_ori(DisasContext *ctx, arg_rr_i *a)                {handle_arg_rr_i(LA_INST_ORI, a); return true;}
-static bool trans_xori(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_XORI, a); return true;}
-static bool trans_sll_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_SLL_W, a); return true;}
-static bool trans_srl_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_SRL_W, a); return true;}
-static bool trans_sra_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_SRA_W, a); return true;}
-static bool trans_sll_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_SLL_D, a); return true;}
-static bool trans_srl_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_SRL_D, a); return true;}
-static bool trans_sra_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_SRA_D, a); return true;}
-static bool trans_rotr_w(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_ROTR_W, a); return true;}
-static bool trans_rotr_d(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_ROTR_D, a); return true;}
-static bool trans_slli_w(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(LA_INST_SLLI_W, a); return true;}
-static bool trans_slli_d(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(LA_INST_SLLI_D, a); return true;}
-static bool trans_srli_w(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(LA_INST_SRLI_W, a); return true;}
-static bool trans_srli_d(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(LA_INST_SRLI_D, a); return true;}
-static bool trans_srai_w(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(LA_INST_SRAI_W, a); return true;}
-static bool trans_srai_d(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(LA_INST_SRAI_D, a); return true;}
-static bool trans_rotri_w(DisasContext *ctx, arg_rr_i *a)            {handle_arg_rr_i(LA_INST_ROTRI_W, a); return true;}
-static bool trans_rotri_d(DisasContext *ctx, arg_rr_i *a)            {handle_arg_rr_i(LA_INST_ROTRI_D, a); return true;}
-static bool trans_ext_w_h(DisasContext *ctx, arg_rr *a)              {handle_arg_rr(LA_INST_EXT_W_H, a); return true;}
-static bool trans_ext_w_b(DisasContext *ctx, arg_rr *a)              {handle_arg_rr(LA_INST_EXT_W_B, a); return true;}
-static bool trans_clo_w(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(LA_INST_CLO_W, a); return true;}
-static bool trans_clz_w(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(LA_INST_CLZ_W, a); return true;}
-static bool trans_cto_w(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(LA_INST_CTO_W, a); return true;}
-static bool trans_ctz_w(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(LA_INST_CTZ_W, a); return true;}
-static bool trans_clo_d(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(LA_INST_CLO_D, a); return true;}
-static bool trans_clz_d(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(LA_INST_CLZ_D, a); return true;}
-static bool trans_cto_d(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(LA_INST_CTO_D, a); return true;}
-static bool trans_ctz_d(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(LA_INST_CTZ_D, a); return true;}
-static bool trans_revb_2h(DisasContext *ctx, arg_rr *a)              {handle_arg_rr(LA_INST_REVB_2H, a); return true;}
-static bool trans_revb_4h(DisasContext *ctx, arg_rr *a)              {handle_arg_rr(LA_INST_REVB_4H, a); return true;}
-static bool trans_revb_2w(DisasContext *ctx, arg_rr *a)              {handle_arg_rr(LA_INST_REVB_2W, a); return true;}
-static bool trans_revb_d(DisasContext *ctx, arg_rr *a)               {handle_arg_rr(LA_INST_REVB_D, a); return true;}
-static bool trans_revh_2w(DisasContext *ctx, arg_rr *a)              {handle_arg_rr(LA_INST_REVH_2W, a); return true;}
-static bool trans_revh_d(DisasContext *ctx, arg_rr *a)               {handle_arg_rr(LA_INST_REVH_D, a); return true;}
-static bool trans_bitrev_4b(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(LA_INST_BITREV_4B, a); return true;}
-static bool trans_bitrev_8b(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(LA_INST_BITREV_8B, a); return true;}
-static bool trans_bitrev_w(DisasContext *ctx, arg_rr *a)             {handle_arg_rr(LA_INST_BITREV_W, a); return true;}
-static bool trans_bitrev_d(DisasContext *ctx, arg_rr *a)             {handle_arg_rr(LA_INST_BITREV_D, a); return true;}
-static bool trans_bytepick_w(DisasContext *ctx, arg_rrr_sa *a)       {handle_arg_rrr_sa(LA_INST_BYTEPICK_W, a); return true;}
-static bool trans_bytepick_d(DisasContext *ctx, arg_rrr_sa *a)       {handle_arg_rrr_sa(LA_INST_BYTEPICK_D, a); return true;}
-static bool trans_maskeqz(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(LA_INST_MASKEQZ, a); return true;}
-static bool trans_masknez(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(LA_INST_MASKNEZ, a); return true;}
-static bool trans_bstrins_w(DisasContext *ctx, arg_rr_ms_ls *a)      {handle_arg_rr_ms_ls(LA_INST_BSTRINS_W, a); return true;}
-static bool trans_bstrpick_w(DisasContext *ctx, arg_rr_ms_ls *a)     {handle_arg_rr_ms_ls(LA_INST_BSTRPICK_W, a); return true;}
-static bool trans_bstrins_d(DisasContext *ctx, arg_rr_ms_ls *a)      {handle_arg_rr_ms_ls(LA_INST_BSTRINS_D, a); return true;}
-static bool trans_bstrpick_d(DisasContext *ctx, arg_rr_ms_ls *a)     {handle_arg_rr_ms_ls(LA_INST_BSTRPICK_D, a); return true;}
-static bool trans_ld_b(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_LD_B, a); return true;}
-static bool trans_ld_h(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_LD_H, a); return true;}
-static bool trans_ld_w(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_LD_W, a); return true;}
-static bool trans_ld_d(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_LD_D, a); return true;}
-static bool trans_st_b(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_ST_B, a); return true;}
-static bool trans_st_h(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_ST_H, a); return true;}
-static bool trans_st_w(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_ST_W, a); return true;}
-static bool trans_st_d(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_ST_D, a); return true;}
-static bool trans_ld_bu(DisasContext *ctx, arg_rr_i *a)              {handle_arg_rr_i(LA_INST_LD_BU, a); return true;}
-static bool trans_ld_hu(DisasContext *ctx, arg_rr_i *a)              {handle_arg_rr_i(LA_INST_LD_HU, a); return true;}
-static bool trans_ld_wu(DisasContext *ctx, arg_rr_i *a)              {handle_arg_rr_i(LA_INST_LD_WU, a); return true;}
-static bool trans_ldx_b(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_LDX_B, a); return true;}
-static bool trans_ldx_h(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_LDX_H, a); return true;}
-static bool trans_ldx_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_LDX_W, a); return true;}
-static bool trans_ldx_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_LDX_D, a); return true;}
-static bool trans_stx_b(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_STX_B, a); return true;}
-static bool trans_stx_h(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_STX_H, a); return true;}
-static bool trans_stx_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_STX_W, a); return true;}
-static bool trans_stx_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(LA_INST_STX_D, a); return true;}
-static bool trans_ldx_bu(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_LDX_BU, a); return true;}
-static bool trans_ldx_hu(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_LDX_HU, a); return true;}
-static bool trans_ldx_wu(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_LDX_WU, a); return true;}
-static bool trans_preld(DisasContext *ctx, arg_hint_r_i *a)          {handle_arg_hint_r_i(LA_INST_PRELD, a); return true;}
-static bool trans_preldx(DisasContext *ctx, arg_hint_rr *a)          {handle_arg_hint_rr(LA_INST_PRELDX, a); return true;}
-static bool trans_dbar(DisasContext *ctx, arg_i *a)                  {handle_arg_i(LA_INST_DBAR, a); return true;}
-static bool trans_ibar(DisasContext *ctx, arg_i *a)                  {handle_arg_i(LA_INST_IBAR, a); return true;}
-static bool trans_ldptr_w(DisasContext *ctx, arg_rr_i *a)            {handle_arg_rr_i(LA_INST_LDPTR_W, a); return true;}
-static bool trans_stptr_w(DisasContext *ctx, arg_rr_i *a)            {handle_arg_rr_i(LA_INST_STPTR_W, a); return true;}
-static bool trans_ldptr_d(DisasContext *ctx, arg_rr_i *a)            {handle_arg_rr_i(LA_INST_LDPTR_D, a); return true;}
-static bool trans_stptr_d(DisasContext *ctx, arg_rr_i *a)            {handle_arg_rr_i(LA_INST_STPTR_D, a); return true;}
-static bool trans_ldgt_b(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_LDGT_B, a); return true;}
-static bool trans_ldgt_h(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_LDGT_H, a); return true;}
-static bool trans_ldgt_w(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_LDGT_W, a); return true;}
-static bool trans_ldgt_d(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_LDGT_D, a); return true;}
-static bool trans_ldle_b(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_LDLE_B, a); return true;}
-static bool trans_ldle_h(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_LDLE_H, a); return true;}
-static bool trans_ldle_w(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_LDLE_W, a); return true;}
-static bool trans_ldle_d(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_LDLE_D, a); return true;}
-static bool trans_stgt_b(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_STGT_B, a); return true;}
-static bool trans_stgt_h(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_STGT_H, a); return true;}
-static bool trans_stgt_w(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_STGT_W, a); return true;}
-static bool trans_stgt_d(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_STGT_D, a); return true;}
-static bool trans_stle_b(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_STLE_B, a); return true;}
-static bool trans_stle_h(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_STLE_H, a); return true;}
-static bool trans_stle_w(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_STLE_W, a); return true;}
-static bool trans_stle_d(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_STLE_D, a); return true;}
-static bool trans_ll_w(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_LL_W, a); return true;}
-static bool trans_sc_w(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_SC_W, a); return true;}
-static bool trans_ll_d(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_LL_D, a); return true;}
-static bool trans_sc_d(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_SC_D, a); return true;}
-static bool trans_amswap_w(DisasContext *ctx, arg_rrr *a)            {handle_arg_rrr(LA_INST_AMSWAP_W, a); return true;}
-static bool trans_amswap_d(DisasContext *ctx, arg_rrr *a)            {handle_arg_rrr(LA_INST_AMSWAP_D, a); return true;}
-static bool trans_amadd_w(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(LA_INST_AMADD_W, a); return true;}
-static bool trans_amadd_d(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(LA_INST_AMADD_D, a); return true;}
-static bool trans_amand_w(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(LA_INST_AMAND_W, a); return true;}
-static bool trans_amand_d(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(LA_INST_AMAND_D, a); return true;}
-static bool trans_amor_w(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_AMOR_W, a); return true;}
-static bool trans_amor_d(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(LA_INST_AMOR_D, a); return true;}
-static bool trans_amxor_w(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(LA_INST_AMXOR_W, a); return true;}
-static bool trans_amxor_d(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(LA_INST_AMXOR_D, a); return true;}
-static bool trans_ammax_w(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(LA_INST_AMMAX_W, a); return true;}
-static bool trans_ammax_d(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(LA_INST_AMMAX_D, a); return true;}
-static bool trans_ammin_w(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(LA_INST_AMMIN_W, a); return true;}
-static bool trans_ammin_d(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(LA_INST_AMMIN_D, a); return true;}
-static bool trans_ammax_wu(DisasContext *ctx, arg_rrr *a)            {handle_arg_rrr(LA_INST_AMMAX_WU, a); return true;}
-static bool trans_ammax_du(DisasContext *ctx, arg_rrr *a)            {handle_arg_rrr(LA_INST_AMMAX_DU, a); return true;}
-static bool trans_ammin_wu(DisasContext *ctx, arg_rrr *a)            {handle_arg_rrr(LA_INST_AMMIN_WU, a); return true;}
-static bool trans_ammin_du(DisasContext *ctx, arg_rrr *a)            {handle_arg_rrr(LA_INST_AMMIN_DU, a); return true;}
-static bool trans_amswap_db_w(DisasContext *ctx, arg_rrr *a)         {handle_arg_rrr(LA_INST_AMSWAP_DB_W, a); return true;}
-static bool trans_amswap_db_d(DisasContext *ctx, arg_rrr *a)         {handle_arg_rrr(LA_INST_AMSWAP_DB_D, a); return true;}
-static bool trans_amadd_db_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(LA_INST_AMADD_DB_W, a); return true;}
-static bool trans_amadd_db_d(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(LA_INST_AMADD_DB_D, a); return true;}
-static bool trans_amand_db_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(LA_INST_AMAND_DB_W, a); return true;}
-static bool trans_amand_db_d(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(LA_INST_AMAND_DB_D, a); return true;}
-static bool trans_amor_db_w(DisasContext *ctx, arg_rrr *a)           {handle_arg_rrr(LA_INST_AMOR_DB_W, a); return true;}
-static bool trans_amor_db_d(DisasContext *ctx, arg_rrr *a)           {handle_arg_rrr(LA_INST_AMOR_DB_D, a); return true;}
-static bool trans_amxor_db_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(LA_INST_AMXOR_DB_W, a); return true;}
-static bool trans_amxor_db_d(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(LA_INST_AMXOR_DB_D, a); return true;}
-static bool trans_ammax_db_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(LA_INST_AMMAX_DB_W, a); return true;}
-static bool trans_ammax_db_d(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(LA_INST_AMMAX_DB_D, a); return true;}
-static bool trans_ammin_db_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(LA_INST_AMMIN_DB_W, a); return true;}
-static bool trans_ammin_db_d(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(LA_INST_AMMIN_DB_D, a); return true;}
-static bool trans_ammax_db_wu(DisasContext *ctx, arg_rrr *a)         {handle_arg_rrr(LA_INST_AMMAX_DB_WU, a); return true;}
-static bool trans_ammax_db_du(DisasContext *ctx, arg_rrr *a)         {handle_arg_rrr(LA_INST_AMMAX_DB_DU, a); return true;}
-static bool trans_ammin_db_wu(DisasContext *ctx, arg_rrr *a)         {handle_arg_rrr(LA_INST_AMMIN_DB_WU, a); return true;}
-static bool trans_ammin_db_du(DisasContext *ctx, arg_rrr *a)         {handle_arg_rrr(LA_INST_AMMIN_DB_DU, a); return true;}
-static bool trans_crc_w_b_w(DisasContext *ctx, arg_rrr *a)           {handle_arg_rrr(LA_INST_CRC_W_B_W, a); return true;}
-static bool trans_crc_w_h_w(DisasContext *ctx, arg_rrr *a)           {handle_arg_rrr(LA_INST_CRC_W_H_W, a); return true;}
-static bool trans_crc_w_w_w(DisasContext *ctx, arg_rrr *a)           {handle_arg_rrr(LA_INST_CRC_W_W_W, a); return true;}
-static bool trans_crc_w_d_w(DisasContext *ctx, arg_rrr *a)           {handle_arg_rrr(LA_INST_CRC_W_D_W, a); return true;}
-static bool trans_crcc_w_b_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(LA_INST_CRCC_W_B_W, a); return true;}
-static bool trans_crcc_w_h_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(LA_INST_CRCC_W_H_W, a); return true;}
-static bool trans_crcc_w_w_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(LA_INST_CRCC_W_W_W, a); return true;}
-static bool trans_crcc_w_d_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(LA_INST_CRCC_W_D_W, a); return true;}
-static bool trans_break(DisasContext *ctx, arg_i *a)                 {handle_arg_i(LA_INST_BREAK, a); return true;}
-static bool trans_syscall(DisasContext *ctx, arg_i *a)               {handle_arg_i(LA_INST_SYSCALL, a); return true;}
-static bool trans_asrtle_d(DisasContext *ctx, arg_rr_jk *a)          {handle_arg_rr_jk(LA_INST_ASRTLE_D, a); return true;}
-static bool trans_asrtgt_d(DisasContext *ctx, arg_rr_jk *a)          {handle_arg_rr_jk(LA_INST_ASRTGT_D, a); return true;}
-static bool trans_rdtimel_w(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(LA_INST_RDTIMEL_W, a); return true;}
-static bool trans_rdtimeh_w(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(LA_INST_RDTIMEH_W, a); return true;}
-static bool trans_rdtime_d(DisasContext *ctx, arg_rr *a)             {handle_arg_rr(LA_INST_RDTIME_D, a); return true;}
-static bool trans_cpucfg(DisasContext *ctx, arg_rr *a)               {handle_arg_rr(LA_INST_CPUCFG, a); return true;}
-static bool trans_fadd_s(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(LA_INST_FADD_S, a); return true;}
-static bool trans_fadd_d(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(LA_INST_FADD_D, a); return true;}
-static bool trans_fsub_s(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(LA_INST_FSUB_S, a); return true;}
-static bool trans_fsub_d(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(LA_INST_FSUB_D, a); return true;}
-static bool trans_fmul_s(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(LA_INST_FMUL_S, a); return true;}
-static bool trans_fmul_d(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(LA_INST_FMUL_D, a); return true;}
-static bool trans_fdiv_s(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(LA_INST_FDIV_S, a); return true;}
-static bool trans_fdiv_d(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(LA_INST_FDIV_D, a); return true;}
-static bool trans_fmadd_s(DisasContext *ctx, arg_ffff *a)            {handle_arg_ffff(LA_INST_FMADD_S, a); return true;}
-static bool trans_fmadd_d(DisasContext *ctx, arg_ffff *a)            {handle_arg_ffff(LA_INST_FMADD_D, a); return true;}
-static bool trans_fmsub_s(DisasContext *ctx, arg_ffff *a)            {handle_arg_ffff(LA_INST_FMSUB_S, a); return true;}
-static bool trans_fmsub_d(DisasContext *ctx, arg_ffff *a)            {handle_arg_ffff(LA_INST_FMSUB_D, a); return true;}
-static bool trans_fnmadd_s(DisasContext *ctx, arg_ffff *a)           {handle_arg_ffff(LA_INST_FNMADD_S, a); return true;}
-static bool trans_fnmadd_d(DisasContext *ctx, arg_ffff *a)           {handle_arg_ffff(LA_INST_FNMADD_D, a); return true;}
-static bool trans_fnmsub_s(DisasContext *ctx, arg_ffff *a)           {handle_arg_ffff(LA_INST_FNMSUB_S, a); return true;}
-static bool trans_fnmsub_d(DisasContext *ctx, arg_ffff *a)           {handle_arg_ffff(LA_INST_FNMSUB_D, a); return true;}
-static bool trans_fmax_s(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(LA_INST_FMAX_S, a); return true;}
-static bool trans_fmax_d(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(LA_INST_FMAX_D, a); return true;}
-static bool trans_fmin_s(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(LA_INST_FMIN_S, a); return true;}
-static bool trans_fmin_d(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(LA_INST_FMIN_D, a); return true;}
-static bool trans_fmaxa_s(DisasContext *ctx, arg_fff *a)             {handle_arg_fff(LA_INST_FMAXA_S, a); return true;}
-static bool trans_fmaxa_d(DisasContext *ctx, arg_fff *a)             {handle_arg_fff(LA_INST_FMAXA_D, a); return true;}
-static bool trans_fmina_s(DisasContext *ctx, arg_fff *a)             {handle_arg_fff(LA_INST_FMINA_S, a); return true;}
-static bool trans_fmina_d(DisasContext *ctx, arg_fff *a)             {handle_arg_fff(LA_INST_FMINA_D, a); return true;}
-static bool trans_fabs_s(DisasContext *ctx, arg_ff *a)               {handle_arg_ff(LA_INST_FABS_S, a); return true;}
-static bool trans_fabs_d(DisasContext *ctx, arg_ff *a)               {handle_arg_ff(LA_INST_FABS_D, a); return true;}
-static bool trans_fneg_s(DisasContext *ctx, arg_ff *a)               {handle_arg_ff(LA_INST_FNEG_S, a); return true;}
-static bool trans_fneg_d(DisasContext *ctx, arg_ff *a)               {handle_arg_ff(LA_INST_FNEG_D, a); return true;}
-static bool trans_fsqrt_s(DisasContext *ctx, arg_ff *a)              {handle_arg_ff(LA_INST_FSQRT_S, a); return true;}
-static bool trans_fsqrt_d(DisasContext *ctx, arg_ff *a)              {handle_arg_ff(LA_INST_FSQRT_D, a); return true;}
-static bool trans_frecip_s(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(LA_INST_FRECIP_S, a); return true;}
-static bool trans_frecip_d(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(LA_INST_FRECIP_D, a); return true;}
-static bool trans_frsqrt_s(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(LA_INST_FRSQRT_S, a); return true;}
-static bool trans_frsqrt_d(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(LA_INST_FRSQRT_D, a); return true;}
-static bool trans_fscaleb_s(DisasContext *ctx, arg_fff *a)           {handle_arg_fff(LA_INST_FSCALEB_S, a); return true;}
-static bool trans_fscaleb_d(DisasContext *ctx, arg_fff *a)           {handle_arg_fff(LA_INST_FSCALEB_D, a); return true;}
-static bool trans_flogb_s(DisasContext *ctx, arg_ff *a)              {handle_arg_ff(LA_INST_FLOGB_S, a); return true;}
-static bool trans_flogb_d(DisasContext *ctx, arg_ff *a)              {handle_arg_ff(LA_INST_FLOGB_D, a); return true;}
-static bool trans_fcopysign_s(DisasContext *ctx, arg_fff *a)         {handle_arg_fff(LA_INST_FCOPYSIGN_S, a); return true;}
-static bool trans_fcopysign_d(DisasContext *ctx, arg_fff *a)         {handle_arg_fff(LA_INST_FCOPYSIGN_D, a); return true;}
-static bool trans_fclass_s(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(LA_INST_FCLASS_S, a); return true;}
-static bool trans_fclass_d(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(LA_INST_FCLASS_D, a); return true;}
-static bool trans_fcmp_cond_s(DisasContext *ctx, arg_cff_fcond *a)   {handle_arg_cff_fcond(LA_INST_FCMP_COND_S, a); return true;}
-static bool trans_fcmp_cond_d(DisasContext *ctx, arg_cff_fcond *a)   {handle_arg_cff_fcond(LA_INST_FCMP_COND_D, a); return true;}
-static bool trans_fcvt_s_d(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(LA_INST_FCVT_S_D, a); return true;}
-static bool trans_fcvt_d_s(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(LA_INST_FCVT_D_S, a); return true;}
-static bool trans_ftintrm_w_s(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(LA_INST_FTINTRM_W_S, a); return true;}
-static bool trans_ftintrm_w_d(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(LA_INST_FTINTRM_W_D, a); return true;}
-static bool trans_ftintrm_l_s(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(LA_INST_FTINTRM_L_S, a); return true;}
-static bool trans_ftintrm_l_d(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(LA_INST_FTINTRM_L_D, a); return true;}
-static bool trans_ftintrp_w_s(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(LA_INST_FTINTRP_W_S, a); return true;}
-static bool trans_ftintrp_w_d(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(LA_INST_FTINTRP_W_D, a); return true;}
-static bool trans_ftintrp_l_s(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(LA_INST_FTINTRP_L_S, a); return true;}
-static bool trans_ftintrp_l_d(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(LA_INST_FTINTRP_L_D, a); return true;}
-static bool trans_ftintrz_w_s(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(LA_INST_FTINTRZ_W_S, a); return true;}
-static bool trans_ftintrz_w_d(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(LA_INST_FTINTRZ_W_D, a); return true;}
-static bool trans_ftintrz_l_s(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(LA_INST_FTINTRZ_L_S, a); return true;}
-static bool trans_ftintrz_l_d(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(LA_INST_FTINTRZ_L_D, a); return true;}
-static bool trans_ftintrne_w_s(DisasContext *ctx, arg_ff *a)         {handle_arg_ff(LA_INST_FTINTRNE_W_S, a); return true;}
-static bool trans_ftintrne_w_d(DisasContext *ctx, arg_ff *a)         {handle_arg_ff(LA_INST_FTINTRNE_W_D, a); return true;}
-static bool trans_ftintrne_l_s(DisasContext *ctx, arg_ff *a)         {handle_arg_ff(LA_INST_FTINTRNE_L_S, a); return true;}
-static bool trans_ftintrne_l_d(DisasContext *ctx, arg_ff *a)         {handle_arg_ff(LA_INST_FTINTRNE_L_D, a); return true;}
-static bool trans_ftint_w_s(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(LA_INST_FTINT_W_S, a); return true;}
-static bool trans_ftint_w_d(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(LA_INST_FTINT_W_D, a); return true;}
-static bool trans_ftint_l_s(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(LA_INST_FTINT_L_S, a); return true;}
-static bool trans_ftint_l_d(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(LA_INST_FTINT_L_D, a); return true;}
-static bool trans_ffint_s_w(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(LA_INST_FFINT_S_W, a); return true;}
-static bool trans_ffint_s_l(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(LA_INST_FFINT_S_L, a); return true;}
-static bool trans_ffint_d_w(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(LA_INST_FFINT_D_W, a); return true;}
-static bool trans_ffint_d_l(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(LA_INST_FFINT_D_L, a); return true;}
-static bool trans_frint_s(DisasContext *ctx, arg_ff *a)              {handle_arg_ff(LA_INST_FRINT_S, a); return true;}
-static bool trans_frint_d(DisasContext *ctx, arg_ff *a)              {handle_arg_ff(LA_INST_FRINT_D, a); return true;}
-static bool trans_fmov_s(DisasContext *ctx, arg_ff *a)               {handle_arg_ff(LA_INST_FMOV_S, a); return true;}
-static bool trans_fmov_d(DisasContext *ctx, arg_ff *a)               {handle_arg_ff(LA_INST_FMOV_D, a); return true;}
-static bool trans_fsel(DisasContext *ctx, arg_fffc *a)               {handle_arg_fffc(LA_INST_FSEL, a); return true;}
-static bool trans_movgr2fr_w(DisasContext *ctx, arg_fr *a)           {handle_arg_fr(LA_INST_MOVGR2FR_W, a); return true;}
-static bool trans_movgr2fr_d(DisasContext *ctx, arg_fr *a)           {handle_arg_fr(LA_INST_MOVGR2FR_D, a); return true;}
-static bool trans_movgr2frh_w(DisasContext *ctx, arg_fr *a)          {handle_arg_fr(LA_INST_MOVGR2FRH_W, a); return true;}
-static bool trans_movfr2gr_s(DisasContext *ctx, arg_rf *a)           {handle_arg_rf(LA_INST_MOVFR2GR_S, a); return true;}
-static bool trans_movfr2gr_d(DisasContext *ctx, arg_rf *a)           {handle_arg_rf(LA_INST_MOVFR2GR_D, a); return true;}
-static bool trans_movfrh2gr_s(DisasContext *ctx, arg_rf *a)          {handle_arg_rf(LA_INST_MOVFRH2GR_S, a); return true;}
-static bool trans_movgr2fcsr(DisasContext *ctx, arg_fcsrd_r *a)      {handle_arg_fcsrd_r(LA_INST_MOVGR2FCSR, a); return true;}
-static bool trans_movfcsr2gr(DisasContext *ctx, arg_r_fcsrs *a)      {handle_arg_r_fcsrs(LA_INST_MOVFCSR2GR, a); return true;}
-static bool trans_movfr2cf(DisasContext *ctx, arg_cf *a)             {handle_arg_cf(LA_INST_MOVFR2CF, a); return true;}
-static bool trans_movcf2fr(DisasContext *ctx, arg_fc *a)             {handle_arg_fc(LA_INST_MOVCF2FR, a); return true;}
-static bool trans_movgr2cf(DisasContext *ctx, arg_cr *a)             {handle_arg_cr(LA_INST_MOVGR2CF, a); return true;}
-static bool trans_movcf2gr(DisasContext *ctx, arg_rc *a)             {handle_arg_rc(LA_INST_MOVCF2GR, a); return true;}
-static bool trans_fld_s(DisasContext *ctx, arg_fr_i *a)              {handle_arg_fr_i(LA_INST_FLD_S, a); return true;}
-static bool trans_fst_s(DisasContext *ctx, arg_fr_i *a)              {handle_arg_fr_i(LA_INST_FST_S, a); return true;}
-static bool trans_fld_d(DisasContext *ctx, arg_fr_i *a)              {handle_arg_fr_i(LA_INST_FLD_D, a); return true;}
-static bool trans_fst_d(DisasContext *ctx, arg_fr_i *a)              {handle_arg_fr_i(LA_INST_FST_D, a); return true;}
-static bool trans_fldx_s(DisasContext *ctx, arg_frr *a)              {handle_arg_frr(LA_INST_FLDX_S, a); return true;}
-static bool trans_fldx_d(DisasContext *ctx, arg_frr *a)              {handle_arg_frr(LA_INST_FLDX_D, a); return true;}
-static bool trans_fstx_s(DisasContext *ctx, arg_frr *a)              {handle_arg_frr(LA_INST_FSTX_S, a); return true;}
-static bool trans_fstx_d(DisasContext *ctx, arg_frr *a)              {handle_arg_frr(LA_INST_FSTX_D, a); return true;}
-static bool trans_fldgt_s(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(LA_INST_FLDGT_S, a); return true;}
-static bool trans_fldgt_d(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(LA_INST_FLDGT_D, a); return true;}
-static bool trans_fldle_s(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(LA_INST_FLDLE_S, a); return true;}
-static bool trans_fldle_d(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(LA_INST_FLDLE_D, a); return true;}
-static bool trans_fstgt_s(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(LA_INST_FSTGT_S, a); return true;}
-static bool trans_fstgt_d(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(LA_INST_FSTGT_D, a); return true;}
-static bool trans_fstle_s(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(LA_INST_FSTLE_S, a); return true;}
-static bool trans_fstle_d(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(LA_INST_FSTLE_D, a); return true;}
-static bool trans_beqz(DisasContext *ctx, arg_r_offs *a)             {handle_arg_r_offs(LA_INST_BEQZ, a); return true;}
-static bool trans_bnez(DisasContext *ctx, arg_r_offs *a)             {handle_arg_r_offs(LA_INST_BNEZ, a); return true;}
-static bool trans_bceqz(DisasContext *ctx, arg_c_offs *a)            {handle_arg_c_offs(LA_INST_BCEQZ, a); return true;}
-static bool trans_bcnez(DisasContext *ctx, arg_c_offs *a)            {handle_arg_c_offs(LA_INST_BCNEZ, a); return true;}
-static bool trans_jirl(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(LA_INST_JIRL, a); return true;}
-static bool trans_b(DisasContext *ctx, arg_offs *a)                  {handle_arg_offs(LA_INST_B, a); return true;}
-static bool trans_bl(DisasContext *ctx, arg_offs *a)                 {handle_arg_offs(LA_INST_BL, a); return true;}
-static bool trans_beq(DisasContext *ctx, arg_rr_offs *a)             {handle_arg_rr_offs(LA_INST_BEQ, a); return true;}
-static bool trans_bne(DisasContext *ctx, arg_rr_offs *a)             {handle_arg_rr_offs(LA_INST_BNE, a); return true;}
-static bool trans_blt(DisasContext *ctx, arg_rr_offs *a)             {handle_arg_rr_offs(LA_INST_BLT, a); return true;}
-static bool trans_bge(DisasContext *ctx, arg_rr_offs *a)             {handle_arg_rr_offs(LA_INST_BGE, a); return true;}
-static bool trans_bltu(DisasContext *ctx, arg_rr_offs *a)            {handle_arg_rr_offs(LA_INST_BLTU, a); return true;}
-static bool trans_bgeu(DisasContext *ctx, arg_rr_offs *a)            {handle_arg_rr_offs(LA_INST_BGEU, a); return true;}
-static bool trans_csrrd(DisasContext *ctx, arg_r_csr *a)             {handle_arg_r_csr(LA_INST_CSRRD, a); return true;}
-static bool trans_csrwr(DisasContext *ctx, arg_r_csr *a)             {handle_arg_r_csr(LA_INST_CSRWR, a); return true;}
-static bool trans_csrxchg(DisasContext *ctx, arg_rr_csr *a)          {handle_arg_rr_csr(LA_INST_CSRXCHG, a); return true;}
-static bool trans_iocsrrd_b(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(LA_INST_IOCSRRD_B, a); return true;}
-static bool trans_iocsrrd_h(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(LA_INST_IOCSRRD_H, a); return true;}
-static bool trans_iocsrrd_w(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(LA_INST_IOCSRRD_W, a); return true;}
-static bool trans_iocsrrd_d(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(LA_INST_IOCSRRD_D, a); return true;}
-static bool trans_iocsrwr_b(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(LA_INST_IOCSRWR_B, a); return true;}
-static bool trans_iocsrwr_h(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(LA_INST_IOCSRWR_H, a); return true;}
-static bool trans_iocsrwr_w(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(LA_INST_IOCSRWR_W, a); return true;}
-static bool trans_iocsrwr_d(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(LA_INST_IOCSRWR_D, a); return true;}
-static bool trans_tlbsrch(DisasContext *ctx, arg_empty *a)           {handle_arg_empty(LA_INST_TLBSRCH, a); return true;}
-static bool trans_tlbrd(DisasContext *ctx, arg_empty *a)             {handle_arg_empty(LA_INST_TLBRD, a); return true;}
-static bool trans_tlbwr(DisasContext *ctx, arg_empty *a)             {handle_arg_empty(LA_INST_TLBWR, a); return true;}
-static bool trans_tlbfill(DisasContext *ctx, arg_empty *a)           {handle_arg_empty(LA_INST_TLBFILL, a); return true;}
-static bool trans_tlbclr(DisasContext *ctx, arg_empty *a)            {handle_arg_empty(LA_INST_TLBCLR, a); return true;}
-static bool trans_tlbflush(DisasContext *ctx, arg_empty *a)          {handle_arg_empty(LA_INST_TLBFLUSH, a); return true;}
-static bool trans_invtlb(DisasContext *ctx, arg_i_rr *a)             {handle_arg_i_rr(LA_INST_INVTLB, a); return true;}
-static bool trans_cacop(DisasContext *ctx, arg_cop_r_i *a)           {handle_arg_cop_r_i(LA_INST_CACOP, a); return true;}
-static bool trans_lddir(DisasContext *ctx, arg_rr_i *a)              {handle_arg_rr_i(LA_INST_LDDIR, a); return true;}
-static bool trans_ldpte(DisasContext *ctx, arg_j_i *a)               {handle_arg_j_i(LA_INST_LDPTE, a); return true;}
-static bool trans_ertn(DisasContext *ctx, arg_empty *a)              {handle_arg_empty(LA_INST_ERTN, a); return true;}
-static bool trans_idle(DisasContext *ctx, arg_i *a)                  {handle_arg_i(LA_INST_IDLE, a); return true;}
-static bool trans_dbcl(DisasContext *ctx, arg_i *a)                  {handle_arg_i(LA_INST_DBCL, a); return true;}
-static bool trans_vadd_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VADD_B, a); return true;}
-static bool trans_vadd_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VADD_H, a); return true;}
-static bool trans_vadd_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VADD_W, a); return true;}
-static bool trans_vadd_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VADD_D, a); return true;}
-static bool trans_vadd_q(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VADD_Q, a); return true;}
-static bool trans_vsub_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSUB_B, a); return true;}
-static bool trans_vsub_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSUB_H, a); return true;}
-static bool trans_vsub_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSUB_W, a); return true;}
-static bool trans_vsub_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSUB_D, a); return true;}
-static bool trans_vsub_q(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSUB_Q, a); return true;}
-static bool trans_vaddi_bu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VADDI_BU, a); return true;}
-static bool trans_vaddi_hu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VADDI_HU, a); return true;}
-static bool trans_vaddi_wu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VADDI_WU, a); return true;}
-static bool trans_vaddi_du(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VADDI_DU, a); return true;}
-static bool trans_vsubi_bu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSUBI_BU, a); return true;}
-static bool trans_vsubi_hu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSUBI_HU, a); return true;}
-static bool trans_vsubi_wu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSUBI_WU, a); return true;}
-static bool trans_vsubi_du(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSUBI_DU, a); return true;}
-static bool trans_vneg_b(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(LA_INST_VNEG_B, a); return true;}
-static bool trans_vneg_h(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(LA_INST_VNEG_H, a); return true;}
-static bool trans_vneg_w(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(LA_INST_VNEG_W, a); return true;}
-static bool trans_vneg_d(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(LA_INST_VNEG_D, a); return true;}
-static bool trans_vsadd_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSADD_B, a); return true;}
-static bool trans_vsadd_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSADD_H, a); return true;}
-static bool trans_vsadd_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSADD_W, a); return true;}
-static bool trans_vsadd_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSADD_D, a); return true;}
-static bool trans_vsadd_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VSADD_BU, a); return true;}
-static bool trans_vsadd_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VSADD_HU, a); return true;}
-static bool trans_vsadd_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VSADD_WU, a); return true;}
-static bool trans_vsadd_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VSADD_DU, a); return true;}
-static bool trans_vssub_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSSUB_B, a); return true;}
-static bool trans_vssub_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSSUB_H, a); return true;}
-static bool trans_vssub_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSSUB_W, a); return true;}
-static bool trans_vssub_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSSUB_D, a); return true;}
-static bool trans_vssub_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VSSUB_BU, a); return true;}
-static bool trans_vssub_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VSSUB_HU, a); return true;}
-static bool trans_vssub_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VSSUB_WU, a); return true;}
-static bool trans_vssub_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VSSUB_DU, a); return true;}
-static bool trans_vhaddw_h_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VHADDW_H_B, a); return true;}
-static bool trans_vhaddw_w_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VHADDW_W_H, a); return true;}
-static bool trans_vhaddw_d_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VHADDW_D_W, a); return true;}
-static bool trans_vhaddw_q_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VHADDW_Q_D, a); return true;}
-static bool trans_vhaddw_hu_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VHADDW_HU_BU, a); return true;}
-static bool trans_vhaddw_wu_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VHADDW_WU_HU, a); return true;}
-static bool trans_vhaddw_du_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VHADDW_DU_WU, a); return true;}
-static bool trans_vhaddw_qu_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VHADDW_QU_DU, a); return true;}
-static bool trans_vhsubw_h_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VHSUBW_H_B, a); return true;}
-static bool trans_vhsubw_w_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VHSUBW_W_H, a); return true;}
-static bool trans_vhsubw_d_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VHSUBW_D_W, a); return true;}
-static bool trans_vhsubw_q_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VHSUBW_Q_D, a); return true;}
-static bool trans_vhsubw_hu_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VHSUBW_HU_BU, a); return true;}
-static bool trans_vhsubw_wu_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VHSUBW_WU_HU, a); return true;}
-static bool trans_vhsubw_du_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VHSUBW_DU_WU, a); return true;}
-static bool trans_vhsubw_qu_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VHSUBW_QU_DU, a); return true;}
-static bool trans_vaddwev_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VADDWEV_H_B, a); return true;}
-static bool trans_vaddwev_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VADDWEV_W_H, a); return true;}
-static bool trans_vaddwev_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VADDWEV_D_W, a); return true;}
-static bool trans_vaddwev_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VADDWEV_Q_D, a); return true;}
-static bool trans_vaddwod_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VADDWOD_H_B, a); return true;}
-static bool trans_vaddwod_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VADDWOD_W_H, a); return true;}
-static bool trans_vaddwod_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VADDWOD_D_W, a); return true;}
-static bool trans_vaddwod_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VADDWOD_Q_D, a); return true;}
-static bool trans_vsubwev_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSUBWEV_H_B, a); return true;}
-static bool trans_vsubwev_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSUBWEV_W_H, a); return true;}
-static bool trans_vsubwev_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSUBWEV_D_W, a); return true;}
-static bool trans_vsubwev_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSUBWEV_Q_D, a); return true;}
-static bool trans_vsubwod_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSUBWOD_H_B, a); return true;}
-static bool trans_vsubwod_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSUBWOD_W_H, a); return true;}
-static bool trans_vsubwod_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSUBWOD_D_W, a); return true;}
-static bool trans_vsubwod_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSUBWOD_Q_D, a); return true;}
-static bool trans_vaddwev_h_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VADDWEV_H_BU, a); return true;}
-static bool trans_vaddwev_w_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VADDWEV_W_HU, a); return true;}
-static bool trans_vaddwev_d_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VADDWEV_D_WU, a); return true;}
-static bool trans_vaddwev_q_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VADDWEV_Q_DU, a); return true;}
-static bool trans_vaddwod_h_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VADDWOD_H_BU, a); return true;}
-static bool trans_vaddwod_w_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VADDWOD_W_HU, a); return true;}
-static bool trans_vaddwod_d_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VADDWOD_D_WU, a); return true;}
-static bool trans_vaddwod_q_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VADDWOD_Q_DU, a); return true;}
-static bool trans_vsubwev_h_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VSUBWEV_H_BU, a); return true;}
-static bool trans_vsubwev_w_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VSUBWEV_W_HU, a); return true;}
-static bool trans_vsubwev_d_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VSUBWEV_D_WU, a); return true;}
-static bool trans_vsubwev_q_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VSUBWEV_Q_DU, a); return true;}
-static bool trans_vsubwod_h_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VSUBWOD_H_BU, a); return true;}
-static bool trans_vsubwod_w_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VSUBWOD_W_HU, a); return true;}
-static bool trans_vsubwod_d_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VSUBWOD_D_WU, a); return true;}
-static bool trans_vsubwod_q_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VSUBWOD_Q_DU, a); return true;}
-static bool trans_vaddwev_h_bu_b(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VADDWEV_H_BU_B, a); return true;}
-static bool trans_vaddwev_w_hu_h(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VADDWEV_W_HU_H, a); return true;}
-static bool trans_vaddwev_d_wu_w(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VADDWEV_D_WU_W, a); return true;}
-static bool trans_vaddwev_q_du_d(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VADDWEV_Q_DU_D, a); return true;}
-static bool trans_vaddwod_h_bu_b(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VADDWOD_H_BU_B, a); return true;}
-static bool trans_vaddwod_w_hu_h(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VADDWOD_W_HU_H, a); return true;}
-static bool trans_vaddwod_d_wu_w(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VADDWOD_D_WU_W, a); return true;}
-static bool trans_vaddwod_q_du_d(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VADDWOD_Q_DU_D, a); return true;}
-static bool trans_vavg_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VAVG_B, a); return true;}
-static bool trans_vavg_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VAVG_H, a); return true;}
-static bool trans_vavg_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VAVG_W, a); return true;}
-static bool trans_vavg_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VAVG_D, a); return true;}
-static bool trans_vavg_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VAVG_BU, a); return true;}
-static bool trans_vavg_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VAVG_HU, a); return true;}
-static bool trans_vavg_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VAVG_WU, a); return true;}
-static bool trans_vavg_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VAVG_DU, a); return true;}
-static bool trans_vavgr_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VAVGR_B, a); return true;}
-static bool trans_vavgr_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VAVGR_H, a); return true;}
-static bool trans_vavgr_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VAVGR_W, a); return true;}
-static bool trans_vavgr_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VAVGR_D, a); return true;}
-static bool trans_vavgr_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VAVGR_BU, a); return true;}
-static bool trans_vavgr_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VAVGR_HU, a); return true;}
-static bool trans_vavgr_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VAVGR_WU, a); return true;}
-static bool trans_vavgr_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VAVGR_DU, a); return true;}
-static bool trans_vabsd_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VABSD_B, a); return true;}
-static bool trans_vabsd_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VABSD_H, a); return true;}
-static bool trans_vabsd_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VABSD_W, a); return true;}
-static bool trans_vabsd_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VABSD_D, a); return true;}
-static bool trans_vabsd_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VABSD_BU, a); return true;}
-static bool trans_vabsd_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VABSD_HU, a); return true;}
-static bool trans_vabsd_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VABSD_WU, a); return true;}
-static bool trans_vabsd_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VABSD_DU, a); return true;}
-static bool trans_vadda_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VADDA_B, a); return true;}
-static bool trans_vadda_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VADDA_H, a); return true;}
-static bool trans_vadda_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VADDA_W, a); return true;}
-static bool trans_vadda_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VADDA_D, a); return true;}
-static bool trans_vmax_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMAX_B, a); return true;}
-static bool trans_vmax_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMAX_H, a); return true;}
-static bool trans_vmax_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMAX_W, a); return true;}
-static bool trans_vmax_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMAX_D, a); return true;}
-static bool trans_vmaxi_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VMAXI_B, a); return true;}
-static bool trans_vmaxi_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VMAXI_H, a); return true;}
-static bool trans_vmaxi_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VMAXI_W, a); return true;}
-static bool trans_vmaxi_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VMAXI_D, a); return true;}
-static bool trans_vmax_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMAX_BU, a); return true;}
-static bool trans_vmax_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMAX_HU, a); return true;}
-static bool trans_vmax_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMAX_WU, a); return true;}
-static bool trans_vmax_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMAX_DU, a); return true;}
-static bool trans_vmaxi_bu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VMAXI_BU, a); return true;}
-static bool trans_vmaxi_hu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VMAXI_HU, a); return true;}
-static bool trans_vmaxi_wu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VMAXI_WU, a); return true;}
-static bool trans_vmaxi_du(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VMAXI_DU, a); return true;}
-static bool trans_vmin_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMIN_B, a); return true;}
-static bool trans_vmin_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMIN_H, a); return true;}
-static bool trans_vmin_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMIN_W, a); return true;}
-static bool trans_vmin_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMIN_D, a); return true;}
-static bool trans_vmini_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VMINI_B, a); return true;}
-static bool trans_vmini_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VMINI_H, a); return true;}
-static bool trans_vmini_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VMINI_W, a); return true;}
-static bool trans_vmini_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VMINI_D, a); return true;}
-static bool trans_vmin_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMIN_BU, a); return true;}
-static bool trans_vmin_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMIN_HU, a); return true;}
-static bool trans_vmin_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMIN_WU, a); return true;}
-static bool trans_vmin_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMIN_DU, a); return true;}
-static bool trans_vmini_bu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VMINI_BU, a); return true;}
-static bool trans_vmini_hu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VMINI_HU, a); return true;}
-static bool trans_vmini_wu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VMINI_WU, a); return true;}
-static bool trans_vmini_du(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VMINI_DU, a); return true;}
-static bool trans_vmul_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMUL_B, a); return true;}
-static bool trans_vmul_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMUL_H, a); return true;}
-static bool trans_vmul_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMUL_W, a); return true;}
-static bool trans_vmul_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMUL_D, a); return true;}
-static bool trans_vmuh_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMUH_B, a); return true;}
-static bool trans_vmuh_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMUH_H, a); return true;}
-static bool trans_vmuh_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMUH_W, a); return true;}
-static bool trans_vmuh_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMUH_D, a); return true;}
-static bool trans_vmuh_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMUH_BU, a); return true;}
-static bool trans_vmuh_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMUH_HU, a); return true;}
-static bool trans_vmuh_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMUH_WU, a); return true;}
-static bool trans_vmuh_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMUH_DU, a); return true;}
-static bool trans_vmulwev_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VMULWEV_H_B, a); return true;}
-static bool trans_vmulwev_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VMULWEV_W_H, a); return true;}
-static bool trans_vmulwev_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VMULWEV_D_W, a); return true;}
-static bool trans_vmulwev_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VMULWEV_Q_D, a); return true;}
-static bool trans_vmulwod_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VMULWOD_H_B, a); return true;}
-static bool trans_vmulwod_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VMULWOD_W_H, a); return true;}
-static bool trans_vmulwod_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VMULWOD_D_W, a); return true;}
-static bool trans_vmulwod_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VMULWOD_Q_D, a); return true;}
-static bool trans_vmulwev_h_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMULWEV_H_BU, a); return true;}
-static bool trans_vmulwev_w_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMULWEV_W_HU, a); return true;}
-static bool trans_vmulwev_d_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMULWEV_D_WU, a); return true;}
-static bool trans_vmulwev_q_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMULWEV_Q_DU, a); return true;}
-static bool trans_vmulwod_h_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMULWOD_H_BU, a); return true;}
-static bool trans_vmulwod_w_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMULWOD_W_HU, a); return true;}
-static bool trans_vmulwod_d_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMULWOD_D_WU, a); return true;}
-static bool trans_vmulwod_q_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMULWOD_Q_DU, a); return true;}
-static bool trans_vmulwev_h_bu_b(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VMULWEV_H_BU_B, a); return true;}
-static bool trans_vmulwev_w_hu_h(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VMULWEV_W_HU_H, a); return true;}
-static bool trans_vmulwev_d_wu_w(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VMULWEV_D_WU_W, a); return true;}
-static bool trans_vmulwev_q_du_d(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VMULWEV_Q_DU_D, a); return true;}
-static bool trans_vmulwod_h_bu_b(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VMULWOD_H_BU_B, a); return true;}
-static bool trans_vmulwod_w_hu_h(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VMULWOD_W_HU_H, a); return true;}
-static bool trans_vmulwod_d_wu_w(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VMULWOD_D_WU_W, a); return true;}
-static bool trans_vmulwod_q_du_d(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_VMULWOD_Q_DU_D, a); return true;}
-static bool trans_vmadd_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMADD_B, a); return true;}
-static bool trans_vmadd_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMADD_H, a); return true;}
-static bool trans_vmadd_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMADD_W, a); return true;}
-static bool trans_vmadd_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMADD_D, a); return true;}
-static bool trans_vmsub_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMSUB_B, a); return true;}
-static bool trans_vmsub_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMSUB_H, a); return true;}
-static bool trans_vmsub_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMSUB_W, a); return true;}
-static bool trans_vmsub_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMSUB_D, a); return true;}
-static bool trans_vmaddwev_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMADDWEV_H_B, a); return true;}
-static bool trans_vmaddwev_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMADDWEV_W_H, a); return true;}
-static bool trans_vmaddwev_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMADDWEV_D_W, a); return true;}
-static bool trans_vmaddwev_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMADDWEV_Q_D, a); return true;}
-static bool trans_vmaddwod_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMADDWOD_H_B, a); return true;}
-static bool trans_vmaddwod_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMADDWOD_W_H, a); return true;}
-static bool trans_vmaddwod_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMADDWOD_D_W, a); return true;}
-static bool trans_vmaddwod_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VMADDWOD_Q_D, a); return true;}
-static bool trans_vmaddwev_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_VMADDWEV_H_BU, a); return true;}
-static bool trans_vmaddwev_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_VMADDWEV_W_HU, a); return true;}
-static bool trans_vmaddwev_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_VMADDWEV_D_WU, a); return true;}
-static bool trans_vmaddwev_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_VMADDWEV_Q_DU, a); return true;}
-static bool trans_vmaddwod_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_VMADDWOD_H_BU, a); return true;}
-static bool trans_vmaddwod_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_VMADDWOD_W_HU, a); return true;}
-static bool trans_vmaddwod_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_VMADDWOD_D_WU, a); return true;}
-static bool trans_vmaddwod_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_VMADDWOD_Q_DU, a); return true;}
-static bool trans_vmaddwev_h_bu_b(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_VMADDWEV_H_BU_B, a); return true;}
-static bool trans_vmaddwev_w_hu_h(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_VMADDWEV_W_HU_H, a); return true;}
-static bool trans_vmaddwev_d_wu_w(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_VMADDWEV_D_WU_W, a); return true;}
-static bool trans_vmaddwev_q_du_d(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_VMADDWEV_Q_DU_D, a); return true;}
-static bool trans_vmaddwod_h_bu_b(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_VMADDWOD_H_BU_B, a); return true;}
-static bool trans_vmaddwod_w_hu_h(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_VMADDWOD_W_HU_H, a); return true;}
-static bool trans_vmaddwod_d_wu_w(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_VMADDWOD_D_WU_W, a); return true;}
-static bool trans_vmaddwod_q_du_d(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_VMADDWOD_Q_DU_D, a); return true;}
-static bool trans_vdiv_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VDIV_B, a); return true;}
-static bool trans_vdiv_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VDIV_H, a); return true;}
-static bool trans_vdiv_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VDIV_W, a); return true;}
-static bool trans_vdiv_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VDIV_D, a); return true;}
-static bool trans_vdiv_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VDIV_BU, a); return true;}
-static bool trans_vdiv_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VDIV_HU, a); return true;}
-static bool trans_vdiv_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VDIV_WU, a); return true;}
-static bool trans_vdiv_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VDIV_DU, a); return true;}
-static bool trans_vmod_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMOD_B, a); return true;}
-static bool trans_vmod_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMOD_H, a); return true;}
-static bool trans_vmod_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMOD_W, a); return true;}
-static bool trans_vmod_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VMOD_D, a); return true;}
-static bool trans_vmod_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMOD_BU, a); return true;}
-static bool trans_vmod_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMOD_HU, a); return true;}
-static bool trans_vmod_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMOD_WU, a); return true;}
-static bool trans_vmod_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VMOD_DU, a); return true;}
-static bool trans_vsat_b(DisasContext *ctx, arg_vv_i *a)             {handle_arg_vv_i(LA_INST_VSAT_B, a); return true;}
-static bool trans_vsat_h(DisasContext *ctx, arg_vv_i *a)             {handle_arg_vv_i(LA_INST_VSAT_H, a); return true;}
-static bool trans_vsat_w(DisasContext *ctx, arg_vv_i *a)             {handle_arg_vv_i(LA_INST_VSAT_W, a); return true;}
-static bool trans_vsat_d(DisasContext *ctx, arg_vv_i *a)             {handle_arg_vv_i(LA_INST_VSAT_D, a); return true;}
-static bool trans_vsat_bu(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSAT_BU, a); return true;}
-static bool trans_vsat_hu(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSAT_HU, a); return true;}
-static bool trans_vsat_wu(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSAT_WU, a); return true;}
-static bool trans_vsat_du(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSAT_DU, a); return true;}
-static bool trans_vexth_h_b(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VEXTH_H_B, a); return true;}
-static bool trans_vexth_w_h(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VEXTH_W_H, a); return true;}
-static bool trans_vexth_d_w(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VEXTH_D_W, a); return true;}
-static bool trans_vexth_q_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VEXTH_Q_D, a); return true;}
-static bool trans_vexth_hu_bu(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VEXTH_HU_BU, a); return true;}
-static bool trans_vexth_wu_hu(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VEXTH_WU_HU, a); return true;}
-static bool trans_vexth_du_wu(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VEXTH_DU_WU, a); return true;}
-static bool trans_vexth_qu_du(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VEXTH_QU_DU, a); return true;}
-static bool trans_vsigncov_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSIGNCOV_B, a); return true;}
-static bool trans_vsigncov_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSIGNCOV_H, a); return true;}
-static bool trans_vsigncov_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSIGNCOV_W, a); return true;}
-static bool trans_vsigncov_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSIGNCOV_D, a); return true;}
-static bool trans_vmskltz_b(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VMSKLTZ_B, a); return true;}
-static bool trans_vmskltz_h(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VMSKLTZ_H, a); return true;}
-static bool trans_vmskltz_w(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VMSKLTZ_W, a); return true;}
-static bool trans_vmskltz_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VMSKLTZ_D, a); return true;}
-static bool trans_vmskgez_b(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VMSKGEZ_B, a); return true;}
-static bool trans_vmsknz_b(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(LA_INST_VMSKNZ_B, a); return true;}
-static bool trans_vldi(DisasContext *ctx, arg_v_i *a)                {handle_arg_v_i(LA_INST_VLDI, a); return true;}
-static bool trans_vand_v(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VAND_V, a); return true;}
-static bool trans_vor_v(DisasContext *ctx, arg_vvv *a)               {handle_arg_vvv(LA_INST_VOR_V, a); return true;}
-static bool trans_vxor_v(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VXOR_V, a); return true;}
-static bool trans_vnor_v(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VNOR_V, a); return true;}
-static bool trans_vandn_v(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VANDN_V, a); return true;}
-static bool trans_vorn_v(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VORN_V, a); return true;}
-static bool trans_vandi_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VANDI_B, a); return true;}
-static bool trans_vori_b(DisasContext *ctx, arg_vv_i *a)             {handle_arg_vv_i(LA_INST_VORI_B, a); return true;}
-static bool trans_vxori_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VXORI_B, a); return true;}
-static bool trans_vnori_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VNORI_B, a); return true;}
-static bool trans_vsll_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSLL_B, a); return true;}
-static bool trans_vsll_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSLL_H, a); return true;}
-static bool trans_vsll_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSLL_W, a); return true;}
-static bool trans_vsll_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSLL_D, a); return true;}
-static bool trans_vslli_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSLLI_B, a); return true;}
-static bool trans_vslli_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSLLI_H, a); return true;}
-static bool trans_vslli_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSLLI_W, a); return true;}
-static bool trans_vslli_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSLLI_D, a); return true;}
-static bool trans_vsrl_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSRL_B, a); return true;}
-static bool trans_vsrl_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSRL_H, a); return true;}
-static bool trans_vsrl_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSRL_W, a); return true;}
-static bool trans_vsrl_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSRL_D, a); return true;}
-static bool trans_vsrli_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSRLI_B, a); return true;}
-static bool trans_vsrli_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSRLI_H, a); return true;}
-static bool trans_vsrli_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSRLI_W, a); return true;}
-static bool trans_vsrli_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSRLI_D, a); return true;}
-static bool trans_vsra_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSRA_B, a); return true;}
-static bool trans_vsra_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSRA_H, a); return true;}
-static bool trans_vsra_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSRA_W, a); return true;}
-static bool trans_vsra_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSRA_D, a); return true;}
-static bool trans_vsrai_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSRAI_B, a); return true;}
-static bool trans_vsrai_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSRAI_H, a); return true;}
-static bool trans_vsrai_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSRAI_W, a); return true;}
-static bool trans_vsrai_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSRAI_D, a); return true;}
-static bool trans_vrotr_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VROTR_B, a); return true;}
-static bool trans_vrotr_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VROTR_H, a); return true;}
-static bool trans_vrotr_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VROTR_W, a); return true;}
-static bool trans_vrotr_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VROTR_D, a); return true;}
-static bool trans_vrotri_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VROTRI_B, a); return true;}
-static bool trans_vrotri_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VROTRI_H, a); return true;}
-static bool trans_vrotri_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VROTRI_W, a); return true;}
-static bool trans_vrotri_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VROTRI_D, a); return true;}
-static bool trans_vsllwil_h_b(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSLLWIL_H_B, a); return true;}
-static bool trans_vsllwil_w_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSLLWIL_W_H, a); return true;}
-static bool trans_vsllwil_d_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSLLWIL_D_W, a); return true;}
-static bool trans_vextl_q_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VEXTL_Q_D, a); return true;}
-static bool trans_vsllwil_hu_bu(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_VSLLWIL_HU_BU, a); return true;}
-static bool trans_vsllwil_wu_hu(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_VSLLWIL_WU_HU, a); return true;}
-static bool trans_vsllwil_du_wu(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_VSLLWIL_DU_WU, a); return true;}
-static bool trans_vextl_qu_du(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VEXTL_QU_DU, a); return true;}
-static bool trans_vsrlr_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSRLR_B, a); return true;}
-static bool trans_vsrlr_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSRLR_H, a); return true;}
-static bool trans_vsrlr_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSRLR_W, a); return true;}
-static bool trans_vsrlr_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSRLR_D, a); return true;}
-static bool trans_vsrlri_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSRLRI_B, a); return true;}
-static bool trans_vsrlri_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSRLRI_H, a); return true;}
-static bool trans_vsrlri_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSRLRI_W, a); return true;}
-static bool trans_vsrlri_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSRLRI_D, a); return true;}
-static bool trans_vsrar_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSRAR_B, a); return true;}
-static bool trans_vsrar_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSRAR_H, a); return true;}
-static bool trans_vsrar_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSRAR_W, a); return true;}
-static bool trans_vsrar_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSRAR_D, a); return true;}
-static bool trans_vsrari_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSRARI_B, a); return true;}
-static bool trans_vsrari_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSRARI_H, a); return true;}
-static bool trans_vsrari_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSRARI_W, a); return true;}
-static bool trans_vsrari_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSRARI_D, a); return true;}
-static bool trans_vsrln_b_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VSRLN_B_H, a); return true;}
-static bool trans_vsrln_h_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VSRLN_H_W, a); return true;}
-static bool trans_vsrln_w_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VSRLN_W_D, a); return true;}
-static bool trans_vsran_b_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VSRAN_B_H, a); return true;}
-static bool trans_vsran_h_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VSRAN_H_W, a); return true;}
-static bool trans_vsran_w_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VSRAN_W_D, a); return true;}
-static bool trans_vsrlni_b_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VSRLNI_B_H, a); return true;}
-static bool trans_vsrlni_h_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VSRLNI_H_W, a); return true;}
-static bool trans_vsrlni_w_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VSRLNI_W_D, a); return true;}
-static bool trans_vsrlni_d_q(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VSRLNI_D_Q, a); return true;}
-static bool trans_vsrani_b_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VSRANI_B_H, a); return true;}
-static bool trans_vsrani_h_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VSRANI_H_W, a); return true;}
-static bool trans_vsrani_w_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VSRANI_W_D, a); return true;}
-static bool trans_vsrani_d_q(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VSRANI_D_Q, a); return true;}
-static bool trans_vsrlrn_b_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSRLRN_B_H, a); return true;}
-static bool trans_vsrlrn_h_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSRLRN_H_W, a); return true;}
-static bool trans_vsrlrn_w_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSRLRN_W_D, a); return true;}
-static bool trans_vsrarn_b_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSRARN_B_H, a); return true;}
-static bool trans_vsrarn_h_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSRARN_H_W, a); return true;}
-static bool trans_vsrarn_w_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSRARN_W_D, a); return true;}
-static bool trans_vsrlrni_b_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSRLRNI_B_H, a); return true;}
-static bool trans_vsrlrni_h_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSRLRNI_H_W, a); return true;}
-static bool trans_vsrlrni_w_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSRLRNI_W_D, a); return true;}
-static bool trans_vsrlrni_d_q(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSRLRNI_D_Q, a); return true;}
-static bool trans_vsrarni_b_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSRARNI_B_H, a); return true;}
-static bool trans_vsrarni_h_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSRARNI_H_W, a); return true;}
-static bool trans_vsrarni_w_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSRARNI_W_D, a); return true;}
-static bool trans_vsrarni_d_q(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSRARNI_D_Q, a); return true;}
-static bool trans_vssrln_b_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSSRLN_B_H, a); return true;}
-static bool trans_vssrln_h_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSSRLN_H_W, a); return true;}
-static bool trans_vssrln_w_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSSRLN_W_D, a); return true;}
-static bool trans_vssran_b_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSSRAN_B_H, a); return true;}
-static bool trans_vssran_h_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSSRAN_H_W, a); return true;}
-static bool trans_vssran_w_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VSSRAN_W_D, a); return true;}
-static bool trans_vssrln_bu_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSSRLN_BU_H, a); return true;}
-static bool trans_vssrln_hu_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSSRLN_HU_W, a); return true;}
-static bool trans_vssrln_wu_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSSRLN_WU_D, a); return true;}
-static bool trans_vssran_bu_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSSRAN_BU_H, a); return true;}
-static bool trans_vssran_hu_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSSRAN_HU_W, a); return true;}
-static bool trans_vssran_wu_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSSRAN_WU_D, a); return true;}
-static bool trans_vssrlni_b_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSSRLNI_B_H, a); return true;}
-static bool trans_vssrlni_h_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSSRLNI_H_W, a); return true;}
-static bool trans_vssrlni_w_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSSRLNI_W_D, a); return true;}
-static bool trans_vssrlni_d_q(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSSRLNI_D_Q, a); return true;}
-static bool trans_vssrani_b_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSSRANI_B_H, a); return true;}
-static bool trans_vssrani_h_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSSRANI_H_W, a); return true;}
-static bool trans_vssrani_w_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSSRANI_W_D, a); return true;}
-static bool trans_vssrani_d_q(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_VSSRANI_D_Q, a); return true;}
-static bool trans_vssrlni_bu_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRLNI_BU_H, a); return true;}
-static bool trans_vssrlni_hu_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRLNI_HU_W, a); return true;}
-static bool trans_vssrlni_wu_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRLNI_WU_D, a); return true;}
-static bool trans_vssrlni_du_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRLNI_DU_Q, a); return true;}
-static bool trans_vssrani_bu_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRANI_BU_H, a); return true;}
-static bool trans_vssrani_hu_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRANI_HU_W, a); return true;}
-static bool trans_vssrani_wu_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRANI_WU_D, a); return true;}
-static bool trans_vssrani_du_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRANI_DU_Q, a); return true;}
-static bool trans_vssrlrn_b_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSSRLRN_B_H, a); return true;}
-static bool trans_vssrlrn_h_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSSRLRN_H_W, a); return true;}
-static bool trans_vssrlrn_w_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSSRLRN_W_D, a); return true;}
-static bool trans_vssrarn_b_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSSRARN_B_H, a); return true;}
-static bool trans_vssrarn_h_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSSRARN_H_W, a); return true;}
-static bool trans_vssrarn_w_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_VSSRARN_W_D, a); return true;}
-static bool trans_vssrlrn_bu_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VSSRLRN_BU_H, a); return true;}
-static bool trans_vssrlrn_hu_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VSSRLRN_HU_W, a); return true;}
-static bool trans_vssrlrn_wu_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VSSRLRN_WU_D, a); return true;}
-static bool trans_vssrarn_bu_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VSSRARN_BU_H, a); return true;}
-static bool trans_vssrarn_hu_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VSSRARN_HU_W, a); return true;}
-static bool trans_vssrarn_wu_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VSSRARN_WU_D, a); return true;}
-static bool trans_vssrlrni_b_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRLRNI_B_H, a); return true;}
-static bool trans_vssrlrni_h_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRLRNI_H_W, a); return true;}
-static bool trans_vssrlrni_w_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRLRNI_W_D, a); return true;}
-static bool trans_vssrlrni_d_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRLRNI_D_Q, a); return true;}
-static bool trans_vssrarni_b_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRARNI_B_H, a); return true;}
-static bool trans_vssrarni_h_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRARNI_H_W, a); return true;}
-static bool trans_vssrarni_w_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRARNI_W_D, a); return true;}
-static bool trans_vssrarni_d_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_VSSRARNI_D_Q, a); return true;}
-static bool trans_vssrlrni_bu_h(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_VSSRLRNI_BU_H, a); return true;}
-static bool trans_vssrlrni_hu_w(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_VSSRLRNI_HU_W, a); return true;}
-static bool trans_vssrlrni_wu_d(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_VSSRLRNI_WU_D, a); return true;}
-static bool trans_vssrlrni_du_q(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_VSSRLRNI_DU_Q, a); return true;}
-static bool trans_vssrarni_bu_h(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_VSSRARNI_BU_H, a); return true;}
-static bool trans_vssrarni_hu_w(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_VSSRARNI_HU_W, a); return true;}
-static bool trans_vssrarni_wu_d(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_VSSRARNI_WU_D, a); return true;}
-static bool trans_vssrarni_du_q(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_VSSRARNI_DU_Q, a); return true;}
-static bool trans_vclo_b(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(LA_INST_VCLO_B, a); return true;}
-static bool trans_vclo_h(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(LA_INST_VCLO_H, a); return true;}
-static bool trans_vclo_w(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(LA_INST_VCLO_W, a); return true;}
-static bool trans_vclo_d(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(LA_INST_VCLO_D, a); return true;}
-static bool trans_vclz_b(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(LA_INST_VCLZ_B, a); return true;}
-static bool trans_vclz_h(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(LA_INST_VCLZ_H, a); return true;}
-static bool trans_vclz_w(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(LA_INST_VCLZ_W, a); return true;}
-static bool trans_vclz_d(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(LA_INST_VCLZ_D, a); return true;}
-static bool trans_vpcnt_b(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_VPCNT_B, a); return true;}
-static bool trans_vpcnt_h(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_VPCNT_H, a); return true;}
-static bool trans_vpcnt_w(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_VPCNT_W, a); return true;}
-static bool trans_vpcnt_d(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_VPCNT_D, a); return true;}
-static bool trans_vbitclr_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VBITCLR_B, a); return true;}
-static bool trans_vbitclr_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VBITCLR_H, a); return true;}
-static bool trans_vbitclr_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VBITCLR_W, a); return true;}
-static bool trans_vbitclr_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VBITCLR_D, a); return true;}
-static bool trans_vbitclri_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VBITCLRI_B, a); return true;}
-static bool trans_vbitclri_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VBITCLRI_H, a); return true;}
-static bool trans_vbitclri_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VBITCLRI_W, a); return true;}
-static bool trans_vbitclri_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VBITCLRI_D, a); return true;}
-static bool trans_vbitset_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VBITSET_B, a); return true;}
-static bool trans_vbitset_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VBITSET_H, a); return true;}
-static bool trans_vbitset_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VBITSET_W, a); return true;}
-static bool trans_vbitset_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VBITSET_D, a); return true;}
-static bool trans_vbitseti_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VBITSETI_B, a); return true;}
-static bool trans_vbitseti_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VBITSETI_H, a); return true;}
-static bool trans_vbitseti_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VBITSETI_W, a); return true;}
-static bool trans_vbitseti_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VBITSETI_D, a); return true;}
-static bool trans_vbitrev_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VBITREV_B, a); return true;}
-static bool trans_vbitrev_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VBITREV_H, a); return true;}
-static bool trans_vbitrev_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VBITREV_W, a); return true;}
-static bool trans_vbitrev_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VBITREV_D, a); return true;}
-static bool trans_vbitrevi_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VBITREVI_B, a); return true;}
-static bool trans_vbitrevi_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VBITREVI_H, a); return true;}
-static bool trans_vbitrevi_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VBITREVI_W, a); return true;}
-static bool trans_vbitrevi_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VBITREVI_D, a); return true;}
-static bool trans_vfrstp_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VFRSTP_B, a); return true;}
-static bool trans_vfrstp_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VFRSTP_H, a); return true;}
-static bool trans_vfrstpi_b(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_VFRSTPI_B, a); return true;}
-static bool trans_vfrstpi_h(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_VFRSTPI_H, a); return true;}
-static bool trans_vfadd_s(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VFADD_S, a); return true;}
-static bool trans_vfadd_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VFADD_D, a); return true;}
-static bool trans_vfsub_s(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VFSUB_S, a); return true;}
-static bool trans_vfsub_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VFSUB_D, a); return true;}
-static bool trans_vfmul_s(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VFMUL_S, a); return true;}
-static bool trans_vfmul_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VFMUL_D, a); return true;}
-static bool trans_vfdiv_s(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VFDIV_S, a); return true;}
-static bool trans_vfdiv_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VFDIV_D, a); return true;}
-static bool trans_vfmadd_s(DisasContext *ctx, arg_vvvv *a)           {handle_arg_vvvv(LA_INST_VFMADD_S, a); return true;}
-static bool trans_vfmadd_d(DisasContext *ctx, arg_vvvv *a)           {handle_arg_vvvv(LA_INST_VFMADD_D, a); return true;}
-static bool trans_vfmsub_s(DisasContext *ctx, arg_vvvv *a)           {handle_arg_vvvv(LA_INST_VFMSUB_S, a); return true;}
-static bool trans_vfmsub_d(DisasContext *ctx, arg_vvvv *a)           {handle_arg_vvvv(LA_INST_VFMSUB_D, a); return true;}
-static bool trans_vfnmadd_s(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(LA_INST_VFNMADD_S, a); return true;}
-static bool trans_vfnmadd_d(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(LA_INST_VFNMADD_D, a); return true;}
-static bool trans_vfnmsub_s(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(LA_INST_VFNMSUB_S, a); return true;}
-static bool trans_vfnmsub_d(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(LA_INST_VFNMSUB_D, a); return true;}
-static bool trans_vfmax_s(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VFMAX_S, a); return true;}
-static bool trans_vfmax_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VFMAX_D, a); return true;}
-static bool trans_vfmin_s(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VFMIN_S, a); return true;}
-static bool trans_vfmin_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VFMIN_D, a); return true;}
-static bool trans_vfmaxa_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VFMAXA_S, a); return true;}
-static bool trans_vfmaxa_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VFMAXA_D, a); return true;}
-static bool trans_vfmina_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VFMINA_S, a); return true;}
-static bool trans_vfmina_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_VFMINA_D, a); return true;}
-static bool trans_vflogb_s(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(LA_INST_VFLOGB_S, a); return true;}
-static bool trans_vflogb_d(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(LA_INST_VFLOGB_D, a); return true;}
-static bool trans_vfclass_s(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VFCLASS_S, a); return true;}
-static bool trans_vfclass_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VFCLASS_D, a); return true;}
-static bool trans_vfsqrt_s(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(LA_INST_VFSQRT_S, a); return true;}
-static bool trans_vfsqrt_d(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(LA_INST_VFSQRT_D, a); return true;}
-static bool trans_vfrecip_s(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VFRECIP_S, a); return true;}
-static bool trans_vfrecip_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VFRECIP_D, a); return true;}
-static bool trans_vfrsqrt_s(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VFRSQRT_S, a); return true;}
-static bool trans_vfrsqrt_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_VFRSQRT_D, a); return true;}
-static bool trans_vfcvtl_s_h(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_VFCVTL_S_H, a); return true;}
-static bool trans_vfcvth_s_h(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_VFCVTH_S_H, a); return true;}
-static bool trans_vfcvtl_d_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_VFCVTL_D_S, a); return true;}
-static bool trans_vfcvth_d_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_VFCVTH_D_S, a); return true;}
-static bool trans_vfcvt_h_s(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VFCVT_H_S, a); return true;}
-static bool trans_vfcvt_s_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VFCVT_S_D, a); return true;}
-static bool trans_vfrint_s(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(LA_INST_VFRINT_S, a); return true;}
-static bool trans_vfrint_d(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(LA_INST_VFRINT_D, a); return true;}
-static bool trans_vfrintrm_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_VFRINTRM_S, a); return true;}
-static bool trans_vfrintrm_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_VFRINTRM_D, a); return true;}
-static bool trans_vfrintrp_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_VFRINTRP_S, a); return true;}
-static bool trans_vfrintrp_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_VFRINTRP_D, a); return true;}
-static bool trans_vfrintrz_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_VFRINTRZ_S, a); return true;}
-static bool trans_vfrintrz_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_VFRINTRZ_D, a); return true;}
-static bool trans_vfrintrne_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VFRINTRNE_S, a); return true;}
-static bool trans_vfrintrne_d(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VFRINTRNE_D, a); return true;}
-static bool trans_vftint_w_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_VFTINT_W_S, a); return true;}
-static bool trans_vftint_l_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_VFTINT_L_D, a); return true;}
-static bool trans_vftintrm_w_s(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_VFTINTRM_W_S, a); return true;}
-static bool trans_vftintrm_l_d(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_VFTINTRM_L_D, a); return true;}
-static bool trans_vftintrp_w_s(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_VFTINTRP_W_S, a); return true;}
-static bool trans_vftintrp_l_d(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_VFTINTRP_L_D, a); return true;}
-static bool trans_vftintrz_w_s(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_VFTINTRZ_W_S, a); return true;}
-static bool trans_vftintrz_l_d(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_VFTINTRZ_L_D, a); return true;}
-static bool trans_vftintrne_w_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VFTINTRNE_W_S, a); return true;}
-static bool trans_vftintrne_l_d(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VFTINTRNE_L_D, a); return true;}
-static bool trans_vftint_wu_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VFTINT_WU_S, a); return true;}
-static bool trans_vftint_lu_d(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VFTINT_LU_D, a); return true;}
-static bool trans_vftintrz_wu_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VFTINTRZ_WU_S, a); return true;}
-static bool trans_vftintrz_lu_d(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VFTINTRZ_LU_D, a); return true;}
-static bool trans_vftint_w_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VFTINT_W_D, a); return true;}
-static bool trans_vftintrm_w_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VFTINTRM_W_D, a); return true;}
-static bool trans_vftintrp_w_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VFTINTRP_W_D, a); return true;}
-static bool trans_vftintrz_w_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_VFTINTRZ_W_D, a); return true;}
-static bool trans_vftintrne_w_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_VFTINTRNE_W_D, a); return true;}
-static bool trans_vftintl_l_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VFTINTL_L_S, a); return true;}
-static bool trans_vftinth_l_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VFTINTH_L_S, a); return true;}
-static bool trans_vftintrml_l_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VFTINTRML_L_S, a); return true;}
-static bool trans_vftintrmh_l_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VFTINTRMH_L_S, a); return true;}
-static bool trans_vftintrpl_l_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VFTINTRPL_L_S, a); return true;}
-static bool trans_vftintrph_l_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VFTINTRPH_L_S, a); return true;}
-static bool trans_vftintrzl_l_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VFTINTRZL_L_S, a); return true;}
-static bool trans_vftintrzh_l_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VFTINTRZH_L_S, a); return true;}
-static bool trans_vftintrnel_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(LA_INST_VFTINTRNEL_L_S, a); return true;}
-static bool trans_vftintrneh_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(LA_INST_VFTINTRNEH_L_S, a); return true;}
-static bool trans_vffint_s_w(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_VFFINT_S_W, a); return true;}
-static bool trans_vffint_s_wu(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VFFINT_S_WU, a); return true;}
-static bool trans_vffint_d_l(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_VFFINT_D_L, a); return true;}
-static bool trans_vffint_d_lu(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VFFINT_D_LU, a); return true;}
-static bool trans_vffintl_d_w(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VFFINTL_D_W, a); return true;}
-static bool trans_vffinth_d_w(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VFFINTH_D_W, a); return true;}
-static bool trans_vffint_s_l(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_VFFINT_S_L, a); return true;}
-static bool trans_vseq_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSEQ_B, a); return true;}
-static bool trans_vseq_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSEQ_H, a); return true;}
-static bool trans_vseq_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSEQ_W, a); return true;}
-static bool trans_vseq_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSEQ_D, a); return true;}
-static bool trans_vseqi_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSEQI_B, a); return true;}
-static bool trans_vseqi_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSEQI_H, a); return true;}
-static bool trans_vseqi_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSEQI_W, a); return true;}
-static bool trans_vseqi_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSEQI_D, a); return true;}
-static bool trans_vsle_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSLE_B, a); return true;}
-static bool trans_vsle_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSLE_H, a); return true;}
-static bool trans_vsle_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSLE_W, a); return true;}
-static bool trans_vsle_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSLE_D, a); return true;}
-static bool trans_vslei_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSLEI_B, a); return true;}
-static bool trans_vslei_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSLEI_H, a); return true;}
-static bool trans_vslei_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSLEI_W, a); return true;}
-static bool trans_vslei_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSLEI_D, a); return true;}
-static bool trans_vsle_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSLE_BU, a); return true;}
-static bool trans_vsle_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSLE_HU, a); return true;}
-static bool trans_vsle_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSLE_WU, a); return true;}
-static bool trans_vsle_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSLE_DU, a); return true;}
-static bool trans_vslei_bu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSLEI_BU, a); return true;}
-static bool trans_vslei_hu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSLEI_HU, a); return true;}
-static bool trans_vslei_wu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSLEI_WU, a); return true;}
-static bool trans_vslei_du(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSLEI_DU, a); return true;}
-static bool trans_vslt_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSLT_B, a); return true;}
-static bool trans_vslt_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSLT_H, a); return true;}
-static bool trans_vslt_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSLT_W, a); return true;}
-static bool trans_vslt_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_VSLT_D, a); return true;}
-static bool trans_vslti_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSLTI_B, a); return true;}
-static bool trans_vslti_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSLTI_H, a); return true;}
-static bool trans_vslti_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSLTI_W, a); return true;}
-static bool trans_vslti_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VSLTI_D, a); return true;}
-static bool trans_vslt_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSLT_BU, a); return true;}
-static bool trans_vslt_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSLT_HU, a); return true;}
-static bool trans_vslt_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSLT_WU, a); return true;}
-static bool trans_vslt_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSLT_DU, a); return true;}
-static bool trans_vslti_bu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSLTI_BU, a); return true;}
-static bool trans_vslti_hu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSLTI_HU, a); return true;}
-static bool trans_vslti_wu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSLTI_WU, a); return true;}
-static bool trans_vslti_du(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VSLTI_DU, a); return true;}
-static bool trans_vfcmp_cond_s(DisasContext *ctx, arg_vvv_fcond *a)  {handle_arg_vvv_fcond(LA_INST_VFCMP_COND_S, a); return true;}
-static bool trans_vfcmp_cond_d(DisasContext *ctx, arg_vvv_fcond *a)  {handle_arg_vvv_fcond(LA_INST_VFCMP_COND_D, a); return true;}
-static bool trans_vbitsel_v(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(LA_INST_VBITSEL_V, a); return true;}
-static bool trans_vbitseli_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VBITSELI_B, a); return true;}
-static bool trans_vseteqz_v(DisasContext *ctx, arg_cv *a)            {handle_arg_cv(LA_INST_VSETEQZ_V, a); return true;}
-static bool trans_vsetnez_v(DisasContext *ctx, arg_cv *a)            {handle_arg_cv(LA_INST_VSETNEZ_V, a); return true;}
-static bool trans_vsetanyeqz_b(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(LA_INST_VSETANYEQZ_B, a); return true;}
-static bool trans_vsetanyeqz_h(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(LA_INST_VSETANYEQZ_H, a); return true;}
-static bool trans_vsetanyeqz_w(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(LA_INST_VSETANYEQZ_W, a); return true;}
-static bool trans_vsetanyeqz_d(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(LA_INST_VSETANYEQZ_D, a); return true;}
-static bool trans_vsetallnez_b(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(LA_INST_VSETALLNEZ_B, a); return true;}
-static bool trans_vsetallnez_h(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(LA_INST_VSETALLNEZ_H, a); return true;}
-static bool trans_vsetallnez_w(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(LA_INST_VSETALLNEZ_W, a); return true;}
-static bool trans_vsetallnez_d(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(LA_INST_VSETALLNEZ_D, a); return true;}
-static bool trans_vinsgr2vr_b(DisasContext *ctx, arg_vr_i *a)        {handle_arg_vr_i(LA_INST_VINSGR2VR_B, a); return true;}
-static bool trans_vinsgr2vr_h(DisasContext *ctx, arg_vr_i *a)        {handle_arg_vr_i(LA_INST_VINSGR2VR_H, a); return true;}
-static bool trans_vinsgr2vr_w(DisasContext *ctx, arg_vr_i *a)        {handle_arg_vr_i(LA_INST_VINSGR2VR_W, a); return true;}
-static bool trans_vinsgr2vr_d(DisasContext *ctx, arg_vr_i *a)        {handle_arg_vr_i(LA_INST_VINSGR2VR_D, a); return true;}
-static bool trans_vpickve2gr_b(DisasContext *ctx, arg_rv_i *a)       {handle_arg_rv_i(LA_INST_VPICKVE2GR_B, a); return true;}
-static bool trans_vpickve2gr_h(DisasContext *ctx, arg_rv_i *a)       {handle_arg_rv_i(LA_INST_VPICKVE2GR_H, a); return true;}
-static bool trans_vpickve2gr_w(DisasContext *ctx, arg_rv_i *a)       {handle_arg_rv_i(LA_INST_VPICKVE2GR_W, a); return true;}
-static bool trans_vpickve2gr_d(DisasContext *ctx, arg_rv_i *a)       {handle_arg_rv_i(LA_INST_VPICKVE2GR_D, a); return true;}
-static bool trans_vpickve2gr_bu(DisasContext *ctx, arg_rv_i *a)      {handle_arg_rv_i(LA_INST_VPICKVE2GR_BU, a); return true;}
-static bool trans_vpickve2gr_hu(DisasContext *ctx, arg_rv_i *a)      {handle_arg_rv_i(LA_INST_VPICKVE2GR_HU, a); return true;}
-static bool trans_vpickve2gr_wu(DisasContext *ctx, arg_rv_i *a)      {handle_arg_rv_i(LA_INST_VPICKVE2GR_WU, a); return true;}
-static bool trans_vpickve2gr_du(DisasContext *ctx, arg_rv_i *a)      {handle_arg_rv_i(LA_INST_VPICKVE2GR_DU, a); return true;}
-static bool trans_vreplgr2vr_b(DisasContext *ctx, arg_vr *a)         {handle_arg_vr(LA_INST_VREPLGR2VR_B, a); return true;}
-static bool trans_vreplgr2vr_h(DisasContext *ctx, arg_vr *a)         {handle_arg_vr(LA_INST_VREPLGR2VR_H, a); return true;}
-static bool trans_vreplgr2vr_w(DisasContext *ctx, arg_vr *a)         {handle_arg_vr(LA_INST_VREPLGR2VR_W, a); return true;}
-static bool trans_vreplgr2vr_d(DisasContext *ctx, arg_vr *a)         {handle_arg_vr(LA_INST_VREPLGR2VR_D, a); return true;}
-static bool trans_vreplve_b(DisasContext *ctx, arg_vvr *a)           {handle_arg_vvr(LA_INST_VREPLVE_B, a); return true;}
-static bool trans_vreplve_h(DisasContext *ctx, arg_vvr *a)           {handle_arg_vvr(LA_INST_VREPLVE_H, a); return true;}
-static bool trans_vreplve_w(DisasContext *ctx, arg_vvr *a)           {handle_arg_vvr(LA_INST_VREPLVE_W, a); return true;}
-static bool trans_vreplve_d(DisasContext *ctx, arg_vvr *a)           {handle_arg_vvr(LA_INST_VREPLVE_D, a); return true;}
-static bool trans_vreplvei_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VREPLVEI_B, a); return true;}
-static bool trans_vreplvei_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VREPLVEI_H, a); return true;}
-static bool trans_vreplvei_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VREPLVEI_W, a); return true;}
-static bool trans_vreplvei_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VREPLVEI_D, a); return true;}
-static bool trans_vbsll_v(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VBSLL_V, a); return true;}
-static bool trans_vbsrl_v(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_VBSRL_V, a); return true;}
-static bool trans_vpackev_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPACKEV_B, a); return true;}
-static bool trans_vpackev_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPACKEV_H, a); return true;}
-static bool trans_vpackev_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPACKEV_W, a); return true;}
-static bool trans_vpackev_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPACKEV_D, a); return true;}
-static bool trans_vpackod_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPACKOD_B, a); return true;}
-static bool trans_vpackod_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPACKOD_H, a); return true;}
-static bool trans_vpackod_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPACKOD_W, a); return true;}
-static bool trans_vpackod_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPACKOD_D, a); return true;}
-static bool trans_vpickev_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPICKEV_B, a); return true;}
-static bool trans_vpickev_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPICKEV_H, a); return true;}
-static bool trans_vpickev_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPICKEV_W, a); return true;}
-static bool trans_vpickev_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPICKEV_D, a); return true;}
-static bool trans_vpickod_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPICKOD_B, a); return true;}
-static bool trans_vpickod_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPICKOD_H, a); return true;}
-static bool trans_vpickod_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPICKOD_W, a); return true;}
-static bool trans_vpickod_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_VPICKOD_D, a); return true;}
-static bool trans_vilvl_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VILVL_B, a); return true;}
-static bool trans_vilvl_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VILVL_H, a); return true;}
-static bool trans_vilvl_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VILVL_W, a); return true;}
-static bool trans_vilvl_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VILVL_D, a); return true;}
-static bool trans_vilvh_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VILVH_B, a); return true;}
-static bool trans_vilvh_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VILVH_H, a); return true;}
-static bool trans_vilvh_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VILVH_W, a); return true;}
-static bool trans_vilvh_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VILVH_D, a); return true;}
-static bool trans_vshuf_b(DisasContext *ctx, arg_vvvv *a)            {handle_arg_vvvv(LA_INST_VSHUF_B, a); return true;}
-static bool trans_vshuf_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSHUF_H, a); return true;}
-static bool trans_vshuf_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSHUF_W, a); return true;}
-static bool trans_vshuf_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_VSHUF_D, a); return true;}
-static bool trans_vshuf4i_b(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_VSHUF4I_B, a); return true;}
-static bool trans_vshuf4i_h(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_VSHUF4I_H, a); return true;}
-static bool trans_vshuf4i_w(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_VSHUF4I_W, a); return true;}
-static bool trans_vshuf4i_d(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_VSHUF4I_D, a); return true;}
-static bool trans_vpermi_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_VPERMI_W, a); return true;}
-static bool trans_vextrins_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VEXTRINS_D, a); return true;}
-static bool trans_vextrins_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VEXTRINS_W, a); return true;}
-static bool trans_vextrins_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VEXTRINS_H, a); return true;}
-static bool trans_vextrins_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_VEXTRINS_B, a); return true;}
-static bool trans_vld(DisasContext *ctx, arg_vr_i *a)                {handle_arg_vr_i(LA_INST_VLD, a); return true;}
-static bool trans_vst(DisasContext *ctx, arg_vr_i *a)                {handle_arg_vr_i(LA_INST_VST, a); return true;}
-static bool trans_vldx(DisasContext *ctx, arg_vrr *a)                {handle_arg_vrr(LA_INST_VLDX, a); return true;}
-static bool trans_vstx(DisasContext *ctx, arg_vrr *a)                {handle_arg_vrr(LA_INST_VSTX, a); return true;}
-static bool trans_vldrepl_d(DisasContext *ctx, arg_vr_i *a)          {handle_arg_vr_i(LA_INST_VLDREPL_D, a); return true;}
-static bool trans_vldrepl_w(DisasContext *ctx, arg_vr_i *a)          {handle_arg_vr_i(LA_INST_VLDREPL_W, a); return true;}
-static bool trans_vldrepl_h(DisasContext *ctx, arg_vr_i *a)          {handle_arg_vr_i(LA_INST_VLDREPL_H, a); return true;}
-static bool trans_vldrepl_b(DisasContext *ctx, arg_vr_i *a)          {handle_arg_vr_i(LA_INST_VLDREPL_B, a); return true;}
-static bool trans_vstelm_d(DisasContext *ctx, arg_vr_ii *a)          {handle_arg_vr_ii(LA_INST_VSTELM_D, a); return true;}
-static bool trans_vstelm_w(DisasContext *ctx, arg_vr_ii *a)          {handle_arg_vr_ii(LA_INST_VSTELM_W, a); return true;}
-static bool trans_vstelm_h(DisasContext *ctx, arg_vr_ii *a)          {handle_arg_vr_ii(LA_INST_VSTELM_H, a); return true;}
-static bool trans_vstelm_b(DisasContext *ctx, arg_vr_ii *a)          {handle_arg_vr_ii(LA_INST_VSTELM_B, a); return true;}
-static bool trans_xvadd_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVADD_B, a); return true;}
-static bool trans_xvadd_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVADD_H, a); return true;}
-static bool trans_xvadd_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVADD_W, a); return true;}
-static bool trans_xvadd_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVADD_D, a); return true;}
-static bool trans_xvadd_q(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVADD_Q, a); return true;}
-static bool trans_xvsub_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSUB_B, a); return true;}
-static bool trans_xvsub_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSUB_H, a); return true;}
-static bool trans_xvsub_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSUB_W, a); return true;}
-static bool trans_xvsub_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSUB_D, a); return true;}
-static bool trans_xvsub_q(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSUB_Q, a); return true;}
-static bool trans_xvaddi_bu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVADDI_BU, a); return true;}
-static bool trans_xvaddi_hu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVADDI_HU, a); return true;}
-static bool trans_xvaddi_wu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVADDI_WU, a); return true;}
-static bool trans_xvaddi_du(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVADDI_DU, a); return true;}
-static bool trans_xvsubi_bu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSUBI_BU, a); return true;}
-static bool trans_xvsubi_hu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSUBI_HU, a); return true;}
-static bool trans_xvsubi_wu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSUBI_WU, a); return true;}
-static bool trans_xvsubi_du(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSUBI_DU, a); return true;}
-static bool trans_xvneg_b(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_XVNEG_B, a); return true;}
-static bool trans_xvneg_h(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_XVNEG_H, a); return true;}
-static bool trans_xvneg_w(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_XVNEG_W, a); return true;}
-static bool trans_xvneg_d(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_XVNEG_D, a); return true;}
-static bool trans_xvsadd_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSADD_B, a); return true;}
-static bool trans_xvsadd_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSADD_H, a); return true;}
-static bool trans_xvsadd_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSADD_W, a); return true;}
-static bool trans_xvsadd_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSADD_D, a); return true;}
-static bool trans_xvsadd_bu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVSADD_BU, a); return true;}
-static bool trans_xvsadd_hu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVSADD_HU, a); return true;}
-static bool trans_xvsadd_wu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVSADD_WU, a); return true;}
-static bool trans_xvsadd_du(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVSADD_DU, a); return true;}
-static bool trans_xvssub_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSSUB_B, a); return true;}
-static bool trans_xvssub_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSSUB_H, a); return true;}
-static bool trans_xvssub_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSSUB_W, a); return true;}
-static bool trans_xvssub_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSSUB_D, a); return true;}
-static bool trans_xvssub_bu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVSSUB_BU, a); return true;}
-static bool trans_xvssub_hu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVSSUB_HU, a); return true;}
-static bool trans_xvssub_wu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVSSUB_WU, a); return true;}
-static bool trans_xvssub_du(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVSSUB_DU, a); return true;}
-static bool trans_xvhaddw_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVHADDW_H_B, a); return true;}
-static bool trans_xvhaddw_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVHADDW_W_H, a); return true;}
-static bool trans_xvhaddw_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVHADDW_D_W, a); return true;}
-static bool trans_xvhaddw_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVHADDW_Q_D, a); return true;}
-static bool trans_xvhaddw_hu_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVHADDW_HU_BU, a); return true;}
-static bool trans_xvhaddw_wu_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVHADDW_WU_HU, a); return true;}
-static bool trans_xvhaddw_du_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVHADDW_DU_WU, a); return true;}
-static bool trans_xvhaddw_qu_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVHADDW_QU_DU, a); return true;}
-static bool trans_xvhsubw_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVHSUBW_H_B, a); return true;}
-static bool trans_xvhsubw_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVHSUBW_W_H, a); return true;}
-static bool trans_xvhsubw_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVHSUBW_D_W, a); return true;}
-static bool trans_xvhsubw_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVHSUBW_Q_D, a); return true;}
-static bool trans_xvhsubw_hu_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVHSUBW_HU_BU, a); return true;}
-static bool trans_xvhsubw_wu_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVHSUBW_WU_HU, a); return true;}
-static bool trans_xvhsubw_du_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVHSUBW_DU_WU, a); return true;}
-static bool trans_xvhsubw_qu_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVHSUBW_QU_DU, a); return true;}
-static bool trans_xvaddwev_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVADDWEV_H_B, a); return true;}
-static bool trans_xvaddwev_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVADDWEV_W_H, a); return true;}
-static bool trans_xvaddwev_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVADDWEV_D_W, a); return true;}
-static bool trans_xvaddwev_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVADDWEV_Q_D, a); return true;}
-static bool trans_xvaddwod_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVADDWOD_H_B, a); return true;}
-static bool trans_xvaddwod_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVADDWOD_W_H, a); return true;}
-static bool trans_xvaddwod_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVADDWOD_D_W, a); return true;}
-static bool trans_xvaddwod_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVADDWOD_Q_D, a); return true;}
-static bool trans_xvsubwev_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSUBWEV_H_B, a); return true;}
-static bool trans_xvsubwev_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSUBWEV_W_H, a); return true;}
-static bool trans_xvsubwev_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSUBWEV_D_W, a); return true;}
-static bool trans_xvsubwev_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSUBWEV_Q_D, a); return true;}
-static bool trans_xvsubwod_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSUBWOD_H_B, a); return true;}
-static bool trans_xvsubwod_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSUBWOD_W_H, a); return true;}
-static bool trans_xvsubwod_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSUBWOD_D_W, a); return true;}
-static bool trans_xvsubwod_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSUBWOD_Q_D, a); return true;}
-static bool trans_xvaddwev_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVADDWEV_H_BU, a); return true;}
-static bool trans_xvaddwev_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVADDWEV_W_HU, a); return true;}
-static bool trans_xvaddwev_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVADDWEV_D_WU, a); return true;}
-static bool trans_xvaddwev_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVADDWEV_Q_DU, a); return true;}
-static bool trans_xvaddwod_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVADDWOD_H_BU, a); return true;}
-static bool trans_xvaddwod_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVADDWOD_W_HU, a); return true;}
-static bool trans_xvaddwod_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVADDWOD_D_WU, a); return true;}
-static bool trans_xvaddwod_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVADDWOD_Q_DU, a); return true;}
-static bool trans_xvsubwev_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVSUBWEV_H_BU, a); return true;}
-static bool trans_xvsubwev_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVSUBWEV_W_HU, a); return true;}
-static bool trans_xvsubwev_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVSUBWEV_D_WU, a); return true;}
-static bool trans_xvsubwev_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVSUBWEV_Q_DU, a); return true;}
-static bool trans_xvsubwod_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVSUBWOD_H_BU, a); return true;}
-static bool trans_xvsubwod_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVSUBWOD_W_HU, a); return true;}
-static bool trans_xvsubwod_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVSUBWOD_D_WU, a); return true;}
-static bool trans_xvsubwod_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVSUBWOD_Q_DU, a); return true;}
-static bool trans_xvaddwev_h_bu_b(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVADDWEV_H_BU_B, a); return true;}
-static bool trans_xvaddwev_w_hu_h(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVADDWEV_W_HU_H, a); return true;}
-static bool trans_xvaddwev_d_wu_w(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVADDWEV_D_WU_W, a); return true;}
-static bool trans_xvaddwev_q_du_d(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVADDWEV_Q_DU_D, a); return true;}
-static bool trans_xvaddwod_h_bu_b(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVADDWOD_H_BU_B, a); return true;}
-static bool trans_xvaddwod_w_hu_h(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVADDWOD_W_HU_H, a); return true;}
-static bool trans_xvaddwod_d_wu_w(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVADDWOD_D_WU_W, a); return true;}
-static bool trans_xvaddwod_q_du_d(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVADDWOD_Q_DU_D, a); return true;}
-static bool trans_xvavg_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVAVG_B, a); return true;}
-static bool trans_xvavg_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVAVG_H, a); return true;}
-static bool trans_xvavg_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVAVG_W, a); return true;}
-static bool trans_xvavg_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVAVG_D, a); return true;}
-static bool trans_xvavg_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVAVG_BU, a); return true;}
-static bool trans_xvavg_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVAVG_HU, a); return true;}
-static bool trans_xvavg_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVAVG_WU, a); return true;}
-static bool trans_xvavg_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVAVG_DU, a); return true;}
-static bool trans_xvavgr_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVAVGR_B, a); return true;}
-static bool trans_xvavgr_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVAVGR_H, a); return true;}
-static bool trans_xvavgr_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVAVGR_W, a); return true;}
-static bool trans_xvavgr_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVAVGR_D, a); return true;}
-static bool trans_xvavgr_bu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVAVGR_BU, a); return true;}
-static bool trans_xvavgr_hu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVAVGR_HU, a); return true;}
-static bool trans_xvavgr_wu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVAVGR_WU, a); return true;}
-static bool trans_xvavgr_du(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVAVGR_DU, a); return true;}
-static bool trans_xvabsd_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVABSD_B, a); return true;}
-static bool trans_xvabsd_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVABSD_H, a); return true;}
-static bool trans_xvabsd_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVABSD_W, a); return true;}
-static bool trans_xvabsd_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVABSD_D, a); return true;}
-static bool trans_xvabsd_bu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVABSD_BU, a); return true;}
-static bool trans_xvabsd_hu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVABSD_HU, a); return true;}
-static bool trans_xvabsd_wu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVABSD_WU, a); return true;}
-static bool trans_xvabsd_du(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVABSD_DU, a); return true;}
-static bool trans_xvadda_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVADDA_B, a); return true;}
-static bool trans_xvadda_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVADDA_H, a); return true;}
-static bool trans_xvadda_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVADDA_W, a); return true;}
-static bool trans_xvadda_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVADDA_D, a); return true;}
-static bool trans_xvmax_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMAX_B, a); return true;}
-static bool trans_xvmax_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMAX_H, a); return true;}
-static bool trans_xvmax_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMAX_W, a); return true;}
-static bool trans_xvmax_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMAX_D, a); return true;}
-static bool trans_xvmax_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMAX_BU, a); return true;}
-static bool trans_xvmax_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMAX_HU, a); return true;}
-static bool trans_xvmax_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMAX_WU, a); return true;}
-static bool trans_xvmax_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMAX_DU, a); return true;}
-static bool trans_xvmaxi_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVMAXI_B, a); return true;}
-static bool trans_xvmaxi_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVMAXI_H, a); return true;}
-static bool trans_xvmaxi_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVMAXI_W, a); return true;}
-static bool trans_xvmaxi_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVMAXI_D, a); return true;}
-static bool trans_xvmaxi_bu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVMAXI_BU, a); return true;}
-static bool trans_xvmaxi_hu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVMAXI_HU, a); return true;}
-static bool trans_xvmaxi_wu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVMAXI_WU, a); return true;}
-static bool trans_xvmaxi_du(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVMAXI_DU, a); return true;}
-static bool trans_xvmin_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMIN_B, a); return true;}
-static bool trans_xvmin_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMIN_H, a); return true;}
-static bool trans_xvmin_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMIN_W, a); return true;}
-static bool trans_xvmin_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMIN_D, a); return true;}
-static bool trans_xvmin_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMIN_BU, a); return true;}
-static bool trans_xvmin_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMIN_HU, a); return true;}
-static bool trans_xvmin_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMIN_WU, a); return true;}
-static bool trans_xvmin_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMIN_DU, a); return true;}
-static bool trans_xvmini_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVMINI_B, a); return true;}
-static bool trans_xvmini_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVMINI_H, a); return true;}
-static bool trans_xvmini_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVMINI_W, a); return true;}
-static bool trans_xvmini_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVMINI_D, a); return true;}
-static bool trans_xvmini_bu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVMINI_BU, a); return true;}
-static bool trans_xvmini_hu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVMINI_HU, a); return true;}
-static bool trans_xvmini_wu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVMINI_WU, a); return true;}
-static bool trans_xvmini_du(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVMINI_DU, a); return true;}
-static bool trans_xvmul_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMUL_B, a); return true;}
-static bool trans_xvmul_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMUL_H, a); return true;}
-static bool trans_xvmul_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMUL_W, a); return true;}
-static bool trans_xvmul_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMUL_D, a); return true;}
-static bool trans_xvmuh_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMUH_B, a); return true;}
-static bool trans_xvmuh_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMUH_H, a); return true;}
-static bool trans_xvmuh_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMUH_W, a); return true;}
-static bool trans_xvmuh_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMUH_D, a); return true;}
-static bool trans_xvmuh_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMUH_BU, a); return true;}
-static bool trans_xvmuh_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMUH_HU, a); return true;}
-static bool trans_xvmuh_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMUH_WU, a); return true;}
-static bool trans_xvmuh_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMUH_DU, a); return true;}
-static bool trans_xvmulwev_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVMULWEV_H_B, a); return true;}
-static bool trans_xvmulwev_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVMULWEV_W_H, a); return true;}
-static bool trans_xvmulwev_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVMULWEV_D_W, a); return true;}
-static bool trans_xvmulwev_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVMULWEV_Q_D, a); return true;}
-static bool trans_xvmulwod_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVMULWOD_H_B, a); return true;}
-static bool trans_xvmulwod_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVMULWOD_W_H, a); return true;}
-static bool trans_xvmulwod_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVMULWOD_D_W, a); return true;}
-static bool trans_xvmulwod_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVMULWOD_Q_D, a); return true;}
-static bool trans_xvmulwev_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMULWEV_H_BU, a); return true;}
-static bool trans_xvmulwev_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMULWEV_W_HU, a); return true;}
-static bool trans_xvmulwev_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMULWEV_D_WU, a); return true;}
-static bool trans_xvmulwev_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMULWEV_Q_DU, a); return true;}
-static bool trans_xvmulwod_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMULWOD_H_BU, a); return true;}
-static bool trans_xvmulwod_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMULWOD_W_HU, a); return true;}
-static bool trans_xvmulwod_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMULWOD_D_WU, a); return true;}
-static bool trans_xvmulwod_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMULWOD_Q_DU, a); return true;}
-static bool trans_xvmulwev_h_bu_b(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVMULWEV_H_BU_B, a); return true;}
-static bool trans_xvmulwev_w_hu_h(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVMULWEV_W_HU_H, a); return true;}
-static bool trans_xvmulwev_d_wu_w(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVMULWEV_D_WU_W, a); return true;}
-static bool trans_xvmulwev_q_du_d(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVMULWEV_Q_DU_D, a); return true;}
-static bool trans_xvmulwod_h_bu_b(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVMULWOD_H_BU_B, a); return true;}
-static bool trans_xvmulwod_w_hu_h(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVMULWOD_W_HU_H, a); return true;}
-static bool trans_xvmulwod_d_wu_w(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVMULWOD_D_WU_W, a); return true;}
-static bool trans_xvmulwod_q_du_d(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(LA_INST_XVMULWOD_Q_DU_D, a); return true;}
-static bool trans_xvmadd_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMADD_B, a); return true;}
-static bool trans_xvmadd_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMADD_H, a); return true;}
-static bool trans_xvmadd_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMADD_W, a); return true;}
-static bool trans_xvmadd_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMADD_D, a); return true;}
-static bool trans_xvmsub_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMSUB_B, a); return true;}
-static bool trans_xvmsub_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMSUB_H, a); return true;}
-static bool trans_xvmsub_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMSUB_W, a); return true;}
-static bool trans_xvmsub_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMSUB_D, a); return true;}
-static bool trans_xvmaddwev_h_b(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMADDWEV_H_B, a); return true;}
-static bool trans_xvmaddwev_w_h(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMADDWEV_W_H, a); return true;}
-static bool trans_xvmaddwev_d_w(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMADDWEV_D_W, a); return true;}
-static bool trans_xvmaddwev_q_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMADDWEV_Q_D, a); return true;}
-static bool trans_xvmaddwod_h_b(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMADDWOD_H_B, a); return true;}
-static bool trans_xvmaddwod_w_h(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMADDWOD_W_H, a); return true;}
-static bool trans_xvmaddwod_d_w(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMADDWOD_D_W, a); return true;}
-static bool trans_xvmaddwod_q_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVMADDWOD_Q_D, a); return true;}
-static bool trans_xvmaddwev_h_bu(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_XVMADDWEV_H_BU, a); return true;}
-static bool trans_xvmaddwev_w_hu(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_XVMADDWEV_W_HU, a); return true;}
-static bool trans_xvmaddwev_d_wu(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_XVMADDWEV_D_WU, a); return true;}
-static bool trans_xvmaddwev_q_du(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_XVMADDWEV_Q_DU, a); return true;}
-static bool trans_xvmaddwod_h_bu(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_XVMADDWOD_H_BU, a); return true;}
-static bool trans_xvmaddwod_w_hu(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_XVMADDWOD_W_HU, a); return true;}
-static bool trans_xvmaddwod_d_wu(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_XVMADDWOD_D_WU, a); return true;}
-static bool trans_xvmaddwod_q_du(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_XVMADDWOD_Q_DU, a); return true;}
-static bool trans_xvmaddwev_h_bu_b(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(LA_INST_XVMADDWEV_H_BU_B, a); return true;}
-static bool trans_xvmaddwev_w_hu_h(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(LA_INST_XVMADDWEV_W_HU_H, a); return true;}
-static bool trans_xvmaddwev_d_wu_w(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(LA_INST_XVMADDWEV_D_WU_W, a); return true;}
-static bool trans_xvmaddwev_q_du_d(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(LA_INST_XVMADDWEV_Q_DU_D, a); return true;}
-static bool trans_xvmaddwod_h_bu_b(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(LA_INST_XVMADDWOD_H_BU_B, a); return true;}
-static bool trans_xvmaddwod_w_hu_h(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(LA_INST_XVMADDWOD_W_HU_H, a); return true;}
-static bool trans_xvmaddwod_d_wu_w(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(LA_INST_XVMADDWOD_D_WU_W, a); return true;}
-static bool trans_xvmaddwod_q_du_d(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(LA_INST_XVMADDWOD_Q_DU_D, a); return true;}
-static bool trans_xvdiv_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVDIV_B, a); return true;}
-static bool trans_xvdiv_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVDIV_H, a); return true;}
-static bool trans_xvdiv_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVDIV_W, a); return true;}
-static bool trans_xvdiv_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVDIV_D, a); return true;}
-static bool trans_xvmod_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMOD_B, a); return true;}
-static bool trans_xvmod_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMOD_H, a); return true;}
-static bool trans_xvmod_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMOD_W, a); return true;}
-static bool trans_xvmod_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVMOD_D, a); return true;}
-static bool trans_xvdiv_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVDIV_BU, a); return true;}
-static bool trans_xvdiv_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVDIV_HU, a); return true;}
-static bool trans_xvdiv_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVDIV_WU, a); return true;}
-static bool trans_xvdiv_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVDIV_DU, a); return true;}
-static bool trans_xvmod_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMOD_BU, a); return true;}
-static bool trans_xvmod_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMOD_HU, a); return true;}
-static bool trans_xvmod_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMOD_WU, a); return true;}
-static bool trans_xvmod_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVMOD_DU, a); return true;}
-static bool trans_xvsat_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_XVSAT_B, a); return true;}
-static bool trans_xvsat_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_XVSAT_H, a); return true;}
-static bool trans_xvsat_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_XVSAT_W, a); return true;}
-static bool trans_xvsat_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_XVSAT_D, a); return true;}
-static bool trans_xvsat_bu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSAT_BU, a); return true;}
-static bool trans_xvsat_hu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSAT_HU, a); return true;}
-static bool trans_xvsat_wu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSAT_WU, a); return true;}
-static bool trans_xvsat_du(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSAT_DU, a); return true;}
-static bool trans_xvexth_h_b(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVEXTH_H_B, a); return true;}
-static bool trans_xvexth_w_h(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVEXTH_W_H, a); return true;}
-static bool trans_xvexth_d_w(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVEXTH_D_W, a); return true;}
-static bool trans_xvexth_q_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVEXTH_Q_D, a); return true;}
-static bool trans_xvexth_hu_bu(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVEXTH_HU_BU, a); return true;}
-static bool trans_xvexth_wu_hu(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVEXTH_WU_HU, a); return true;}
-static bool trans_xvexth_du_wu(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVEXTH_DU_WU, a); return true;}
-static bool trans_xvexth_qu_du(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVEXTH_QU_DU, a); return true;}
-static bool trans_vext2xv_h_b(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VEXT2XV_H_B, a); return true;}
-static bool trans_vext2xv_w_b(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VEXT2XV_W_B, a); return true;}
-static bool trans_vext2xv_d_b(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VEXT2XV_D_B, a); return true;}
-static bool trans_vext2xv_w_h(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VEXT2XV_W_H, a); return true;}
-static bool trans_vext2xv_d_h(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VEXT2XV_D_H, a); return true;}
-static bool trans_vext2xv_d_w(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_VEXT2XV_D_W, a); return true;}
-static bool trans_vext2xv_hu_bu(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VEXT2XV_HU_BU, a); return true;}
-static bool trans_vext2xv_wu_bu(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VEXT2XV_WU_BU, a); return true;}
-static bool trans_vext2xv_du_bu(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VEXT2XV_DU_BU, a); return true;}
-static bool trans_vext2xv_wu_hu(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VEXT2XV_WU_HU, a); return true;}
-static bool trans_vext2xv_du_hu(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VEXT2XV_DU_HU, a); return true;}
-static bool trans_vext2xv_du_wu(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_VEXT2XV_DU_WU, a); return true;}
-static bool trans_xvsigncov_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSIGNCOV_B, a); return true;}
-static bool trans_xvsigncov_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSIGNCOV_H, a); return true;}
-static bool trans_xvsigncov_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSIGNCOV_W, a); return true;}
-static bool trans_xvsigncov_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSIGNCOV_D, a); return true;}
-static bool trans_xvmskltz_b(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVMSKLTZ_B, a); return true;}
-static bool trans_xvmskltz_h(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVMSKLTZ_H, a); return true;}
-static bool trans_xvmskltz_w(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVMSKLTZ_W, a); return true;}
-static bool trans_xvmskltz_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVMSKLTZ_D, a); return true;}
-static bool trans_xvmskgez_b(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVMSKGEZ_B, a); return true;}
-static bool trans_xvmsknz_b(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_XVMSKNZ_B, a); return true;}
-static bool trans_xvldi(DisasContext *ctx, arg_v_i *a)               {handle_arg_v_i(LA_INST_XVLDI, a); return true;}
-static bool trans_xvand_v(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVAND_V, a); return true;}
-static bool trans_xvor_v(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(LA_INST_XVOR_V, a); return true;}
-static bool trans_xvxor_v(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVXOR_V, a); return true;}
-static bool trans_xvnor_v(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVNOR_V, a); return true;}
-static bool trans_xvandn_v(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVANDN_V, a); return true;}
-static bool trans_xvorn_v(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVORN_V, a); return true;}
-static bool trans_xvandi_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVANDI_B, a); return true;}
-static bool trans_xvori_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(LA_INST_XVORI_B, a); return true;}
-static bool trans_xvxori_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVXORI_B, a); return true;}
-static bool trans_xvnori_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVNORI_B, a); return true;}
-static bool trans_xvsll_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSLL_B, a); return true;}
-static bool trans_xvsll_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSLL_H, a); return true;}
-static bool trans_xvsll_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSLL_W, a); return true;}
-static bool trans_xvsll_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSLL_D, a); return true;}
-static bool trans_xvslli_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSLLI_B, a); return true;}
-static bool trans_xvslli_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSLLI_H, a); return true;}
-static bool trans_xvslli_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSLLI_W, a); return true;}
-static bool trans_xvslli_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSLLI_D, a); return true;}
-static bool trans_xvsrl_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSRL_B, a); return true;}
-static bool trans_xvsrl_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSRL_H, a); return true;}
-static bool trans_xvsrl_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSRL_W, a); return true;}
-static bool trans_xvsrl_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSRL_D, a); return true;}
-static bool trans_xvsrli_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSRLI_B, a); return true;}
-static bool trans_xvsrli_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSRLI_H, a); return true;}
-static bool trans_xvsrli_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSRLI_W, a); return true;}
-static bool trans_xvsrli_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSRLI_D, a); return true;}
-static bool trans_xvsra_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSRA_B, a); return true;}
-static bool trans_xvsra_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSRA_H, a); return true;}
-static bool trans_xvsra_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSRA_W, a); return true;}
-static bool trans_xvsra_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSRA_D, a); return true;}
-static bool trans_xvsrai_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSRAI_B, a); return true;}
-static bool trans_xvsrai_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSRAI_H, a); return true;}
-static bool trans_xvsrai_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSRAI_W, a); return true;}
-static bool trans_xvsrai_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSRAI_D, a); return true;}
-static bool trans_xvrotr_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVROTR_B, a); return true;}
-static bool trans_xvrotr_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVROTR_H, a); return true;}
-static bool trans_xvrotr_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVROTR_W, a); return true;}
-static bool trans_xvrotr_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVROTR_D, a); return true;}
-static bool trans_xvrotri_b(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVROTRI_B, a); return true;}
-static bool trans_xvrotri_h(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVROTRI_H, a); return true;}
-static bool trans_xvrotri_w(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVROTRI_W, a); return true;}
-static bool trans_xvrotri_d(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVROTRI_D, a); return true;}
-static bool trans_xvsllwil_h_b(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSLLWIL_H_B, a); return true;}
-static bool trans_xvsllwil_w_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSLLWIL_W_H, a); return true;}
-static bool trans_xvsllwil_d_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSLLWIL_D_W, a); return true;}
-static bool trans_xvextl_q_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVEXTL_Q_D, a); return true;}
-static bool trans_xvsllwil_hu_bu(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVSLLWIL_HU_BU, a); return true;}
-static bool trans_xvsllwil_wu_hu(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVSLLWIL_WU_HU, a); return true;}
-static bool trans_xvsllwil_du_wu(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVSLLWIL_DU_WU, a); return true;}
-static bool trans_xvextl_qu_du(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVEXTL_QU_DU, a); return true;}
-static bool trans_xvsrlr_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSRLR_B, a); return true;}
-static bool trans_xvsrlr_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSRLR_H, a); return true;}
-static bool trans_xvsrlr_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSRLR_W, a); return true;}
-static bool trans_xvsrlr_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSRLR_D, a); return true;}
-static bool trans_xvsrlri_b(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSRLRI_B, a); return true;}
-static bool trans_xvsrlri_h(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSRLRI_H, a); return true;}
-static bool trans_xvsrlri_w(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSRLRI_W, a); return true;}
-static bool trans_xvsrlri_d(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSRLRI_D, a); return true;}
-static bool trans_xvsrar_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSRAR_B, a); return true;}
-static bool trans_xvsrar_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSRAR_H, a); return true;}
-static bool trans_xvsrar_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSRAR_W, a); return true;}
-static bool trans_xvsrar_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSRAR_D, a); return true;}
-static bool trans_xvsrari_b(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSRARI_B, a); return true;}
-static bool trans_xvsrari_h(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSRARI_H, a); return true;}
-static bool trans_xvsrari_w(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSRARI_W, a); return true;}
-static bool trans_xvsrari_d(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSRARI_D, a); return true;}
-static bool trans_xvsrln_b_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVSRLN_B_H, a); return true;}
-static bool trans_xvsrln_h_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVSRLN_H_W, a); return true;}
-static bool trans_xvsrln_w_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVSRLN_W_D, a); return true;}
-static bool trans_xvsran_b_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVSRAN_B_H, a); return true;}
-static bool trans_xvsran_h_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVSRAN_H_W, a); return true;}
-static bool trans_xvsran_w_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVSRAN_W_D, a); return true;}
-static bool trans_xvsrlni_b_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVSRLNI_B_H, a); return true;}
-static bool trans_xvsrlni_h_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVSRLNI_H_W, a); return true;}
-static bool trans_xvsrlni_w_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVSRLNI_W_D, a); return true;}
-static bool trans_xvsrlni_d_q(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVSRLNI_D_Q, a); return true;}
-static bool trans_xvsrani_b_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVSRANI_B_H, a); return true;}
-static bool trans_xvsrani_h_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVSRANI_H_W, a); return true;}
-static bool trans_xvsrani_w_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVSRANI_W_D, a); return true;}
-static bool trans_xvsrani_d_q(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVSRANI_D_Q, a); return true;}
-static bool trans_xvsrlrn_b_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSRLRN_B_H, a); return true;}
-static bool trans_xvsrlrn_h_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSRLRN_H_W, a); return true;}
-static bool trans_xvsrlrn_w_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSRLRN_W_D, a); return true;}
-static bool trans_xvsrarn_b_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSRARN_B_H, a); return true;}
-static bool trans_xvsrarn_h_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSRARN_H_W, a); return true;}
-static bool trans_xvsrarn_w_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSRARN_W_D, a); return true;}
-static bool trans_xvsrlrni_b_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSRLRNI_B_H, a); return true;}
-static bool trans_xvsrlrni_h_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSRLRNI_H_W, a); return true;}
-static bool trans_xvsrlrni_w_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSRLRNI_W_D, a); return true;}
-static bool trans_xvsrlrni_d_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSRLRNI_D_Q, a); return true;}
-static bool trans_xvsrarni_b_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSRARNI_B_H, a); return true;}
-static bool trans_xvsrarni_h_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSRARNI_H_W, a); return true;}
-static bool trans_xvsrarni_w_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSRARNI_W_D, a); return true;}
-static bool trans_xvsrarni_d_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSRARNI_D_Q, a); return true;}
-static bool trans_xvssrln_b_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSSRLN_B_H, a); return true;}
-static bool trans_xvssrln_h_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSSRLN_H_W, a); return true;}
-static bool trans_xvssrln_w_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSSRLN_W_D, a); return true;}
-static bool trans_xvssran_b_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSSRAN_B_H, a); return true;}
-static bool trans_xvssran_h_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSSRAN_H_W, a); return true;}
-static bool trans_xvssran_w_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVSSRAN_W_D, a); return true;}
-static bool trans_xvssrln_bu_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSSRLN_BU_H, a); return true;}
-static bool trans_xvssrln_hu_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSSRLN_HU_W, a); return true;}
-static bool trans_xvssrln_wu_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSSRLN_WU_D, a); return true;}
-static bool trans_xvssran_bu_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSSRAN_BU_H, a); return true;}
-static bool trans_xvssran_hu_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSSRAN_HU_W, a); return true;}
-static bool trans_xvssran_wu_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSSRAN_WU_D, a); return true;}
-static bool trans_xvssrlni_b_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSSRLNI_B_H, a); return true;}
-static bool trans_xvssrlni_h_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSSRLNI_H_W, a); return true;}
-static bool trans_xvssrlni_w_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSSRLNI_W_D, a); return true;}
-static bool trans_xvssrlni_d_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSSRLNI_D_Q, a); return true;}
-static bool trans_xvssrani_b_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSSRANI_B_H, a); return true;}
-static bool trans_xvssrani_h_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSSRANI_H_W, a); return true;}
-static bool trans_xvssrani_w_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSSRANI_W_D, a); return true;}
-static bool trans_xvssrani_d_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(LA_INST_XVSSRANI_D_Q, a); return true;}
-static bool trans_xvssrlni_bu_h(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRLNI_BU_H, a); return true;}
-static bool trans_xvssrlni_hu_w(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRLNI_HU_W, a); return true;}
-static bool trans_xvssrlni_wu_d(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRLNI_WU_D, a); return true;}
-static bool trans_xvssrlni_du_q(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRLNI_DU_Q, a); return true;}
-static bool trans_xvssrani_bu_h(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRANI_BU_H, a); return true;}
-static bool trans_xvssrani_hu_w(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRANI_HU_W, a); return true;}
-static bool trans_xvssrani_wu_d(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRANI_WU_D, a); return true;}
-static bool trans_xvssrani_du_q(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRANI_DU_Q, a); return true;}
-static bool trans_xvssrlrn_b_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSSRLRN_B_H, a); return true;}
-static bool trans_xvssrlrn_h_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSSRLRN_H_W, a); return true;}
-static bool trans_xvssrlrn_w_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSSRLRN_W_D, a); return true;}
-static bool trans_xvssrarn_b_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSSRARN_B_H, a); return true;}
-static bool trans_xvssrarn_h_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSSRARN_H_W, a); return true;}
-static bool trans_xvssrarn_w_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(LA_INST_XVSSRARN_W_D, a); return true;}
-static bool trans_xvssrlrn_bu_h(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVSSRLRN_BU_H, a); return true;}
-static bool trans_xvssrlrn_hu_w(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVSSRLRN_HU_W, a); return true;}
-static bool trans_xvssrlrn_wu_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVSSRLRN_WU_D, a); return true;}
-static bool trans_xvssrarn_bu_h(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVSSRARN_BU_H, a); return true;}
-static bool trans_xvssrarn_hu_w(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVSSRARN_HU_W, a); return true;}
-static bool trans_xvssrarn_wu_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVSSRARN_WU_D, a); return true;}
-static bool trans_xvssrlrni_b_h(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRLRNI_B_H, a); return true;}
-static bool trans_xvssrlrni_h_w(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRLRNI_H_W, a); return true;}
-static bool trans_xvssrlrni_w_d(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRLRNI_W_D, a); return true;}
-static bool trans_xvssrlrni_d_q(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRLRNI_D_Q, a); return true;}
-static bool trans_xvssrarni_b_h(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRARNI_B_H, a); return true;}
-static bool trans_xvssrarni_h_w(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRARNI_H_W, a); return true;}
-static bool trans_xvssrarni_w_d(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRARNI_W_D, a); return true;}
-static bool trans_xvssrarni_d_q(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(LA_INST_XVSSRARNI_D_Q, a); return true;}
-static bool trans_xvssrlrni_bu_h(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVSSRLRNI_BU_H, a); return true;}
-static bool trans_xvssrlrni_hu_w(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVSSRLRNI_HU_W, a); return true;}
-static bool trans_xvssrlrni_wu_d(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVSSRLRNI_WU_D, a); return true;}
-static bool trans_xvssrlrni_du_q(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVSSRLRNI_DU_Q, a); return true;}
-static bool trans_xvssrarni_bu_h(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVSSRARNI_BU_H, a); return true;}
-static bool trans_xvssrarni_hu_w(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVSSRARNI_HU_W, a); return true;}
-static bool trans_xvssrarni_wu_d(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVSSRARNI_WU_D, a); return true;}
-static bool trans_xvssrarni_du_q(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVSSRARNI_DU_Q, a); return true;}
-static bool trans_xvclo_b(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_XVCLO_B, a); return true;}
-static bool trans_xvclo_h(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_XVCLO_H, a); return true;}
-static bool trans_xvclo_w(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_XVCLO_W, a); return true;}
-static bool trans_xvclo_d(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_XVCLO_D, a); return true;}
-static bool trans_xvclz_b(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_XVCLZ_B, a); return true;}
-static bool trans_xvclz_h(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_XVCLZ_H, a); return true;}
-static bool trans_xvclz_w(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_XVCLZ_W, a); return true;}
-static bool trans_xvclz_d(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(LA_INST_XVCLZ_D, a); return true;}
-static bool trans_xvpcnt_b(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(LA_INST_XVPCNT_B, a); return true;}
-static bool trans_xvpcnt_h(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(LA_INST_XVPCNT_H, a); return true;}
-static bool trans_xvpcnt_w(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(LA_INST_XVPCNT_W, a); return true;}
-static bool trans_xvpcnt_d(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(LA_INST_XVPCNT_D, a); return true;}
-static bool trans_xvbitclr_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVBITCLR_B, a); return true;}
-static bool trans_xvbitclr_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVBITCLR_H, a); return true;}
-static bool trans_xvbitclr_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVBITCLR_W, a); return true;}
-static bool trans_xvbitclr_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVBITCLR_D, a); return true;}
-static bool trans_xvbitclri_b(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVBITCLRI_B, a); return true;}
-static bool trans_xvbitclri_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVBITCLRI_H, a); return true;}
-static bool trans_xvbitclri_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVBITCLRI_W, a); return true;}
-static bool trans_xvbitclri_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVBITCLRI_D, a); return true;}
-static bool trans_xvbitset_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVBITSET_B, a); return true;}
-static bool trans_xvbitset_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVBITSET_H, a); return true;}
-static bool trans_xvbitset_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVBITSET_W, a); return true;}
-static bool trans_xvbitset_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVBITSET_D, a); return true;}
-static bool trans_xvbitseti_b(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVBITSETI_B, a); return true;}
-static bool trans_xvbitseti_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVBITSETI_H, a); return true;}
-static bool trans_xvbitseti_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVBITSETI_W, a); return true;}
-static bool trans_xvbitseti_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVBITSETI_D, a); return true;}
-static bool trans_xvbitrev_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVBITREV_B, a); return true;}
-static bool trans_xvbitrev_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVBITREV_H, a); return true;}
-static bool trans_xvbitrev_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVBITREV_W, a); return true;}
-static bool trans_xvbitrev_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVBITREV_D, a); return true;}
-static bool trans_xvbitrevi_b(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVBITREVI_B, a); return true;}
-static bool trans_xvbitrevi_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVBITREVI_H, a); return true;}
-static bool trans_xvbitrevi_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVBITREVI_W, a); return true;}
-static bool trans_xvbitrevi_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVBITREVI_D, a); return true;}
-static bool trans_xvfrstp_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVFRSTP_B, a); return true;}
-static bool trans_xvfrstp_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVFRSTP_H, a); return true;}
-static bool trans_xvfrstpi_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_XVFRSTPI_B, a); return true;}
-static bool trans_xvfrstpi_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_XVFRSTPI_H, a); return true;}
-static bool trans_xvfadd_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVFADD_S, a); return true;}
-static bool trans_xvfadd_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVFADD_D, a); return true;}
-static bool trans_xvfsub_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVFSUB_S, a); return true;}
-static bool trans_xvfsub_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVFSUB_D, a); return true;}
-static bool trans_xvfmul_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVFMUL_S, a); return true;}
-static bool trans_xvfmul_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVFMUL_D, a); return true;}
-static bool trans_xvfdiv_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVFDIV_S, a); return true;}
-static bool trans_xvfdiv_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVFDIV_D, a); return true;}
-static bool trans_xvfmadd_s(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(LA_INST_XVFMADD_S, a); return true;}
-static bool trans_xvfmadd_d(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(LA_INST_XVFMADD_D, a); return true;}
-static bool trans_xvfmsub_s(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(LA_INST_XVFMSUB_S, a); return true;}
-static bool trans_xvfmsub_d(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(LA_INST_XVFMSUB_D, a); return true;}
-static bool trans_xvfnmadd_s(DisasContext *ctx, arg_vvvv *a)         {handle_arg_vvvv(LA_INST_XVFNMADD_S, a); return true;}
-static bool trans_xvfnmadd_d(DisasContext *ctx, arg_vvvv *a)         {handle_arg_vvvv(LA_INST_XVFNMADD_D, a); return true;}
-static bool trans_xvfnmsub_s(DisasContext *ctx, arg_vvvv *a)         {handle_arg_vvvv(LA_INST_XVFNMSUB_S, a); return true;}
-static bool trans_xvfnmsub_d(DisasContext *ctx, arg_vvvv *a)         {handle_arg_vvvv(LA_INST_XVFNMSUB_D, a); return true;}
-static bool trans_xvfmax_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVFMAX_S, a); return true;}
-static bool trans_xvfmax_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVFMAX_D, a); return true;}
-static bool trans_xvfmin_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVFMIN_S, a); return true;}
-static bool trans_xvfmin_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVFMIN_D, a); return true;}
-static bool trans_xvfmaxa_s(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVFMAXA_S, a); return true;}
-static bool trans_xvfmaxa_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVFMAXA_D, a); return true;}
-static bool trans_xvfmina_s(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVFMINA_S, a); return true;}
-static bool trans_xvfmina_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(LA_INST_XVFMINA_D, a); return true;}
-static bool trans_xvflogb_s(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_XVFLOGB_S, a); return true;}
-static bool trans_xvflogb_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_XVFLOGB_D, a); return true;}
-static bool trans_xvfclass_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVFCLASS_S, a); return true;}
-static bool trans_xvfclass_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVFCLASS_D, a); return true;}
-static bool trans_xvfsqrt_s(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_XVFSQRT_S, a); return true;}
-static bool trans_xvfsqrt_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_XVFSQRT_D, a); return true;}
-static bool trans_xvfrecip_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVFRECIP_S, a); return true;}
-static bool trans_xvfrecip_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVFRECIP_D, a); return true;}
-static bool trans_xvfrsqrt_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVFRSQRT_S, a); return true;}
-static bool trans_xvfrsqrt_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(LA_INST_XVFRSQRT_D, a); return true;}
-static bool trans_xvfcvtl_s_h(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVFCVTL_S_H, a); return true;}
-static bool trans_xvfcvth_s_h(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVFCVTH_S_H, a); return true;}
-static bool trans_xvfcvtl_d_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVFCVTL_D_S, a); return true;}
-static bool trans_xvfcvth_d_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVFCVTH_D_S, a); return true;}
-static bool trans_xvfcvt_h_s(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVFCVT_H_S, a); return true;}
-static bool trans_xvfcvt_s_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVFCVT_S_D, a); return true;}
-static bool trans_xvfrintrne_s(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVFRINTRNE_S, a); return true;}
-static bool trans_xvfrintrne_d(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVFRINTRNE_D, a); return true;}
-static bool trans_xvfrintrz_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVFRINTRZ_S, a); return true;}
-static bool trans_xvfrintrz_d(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVFRINTRZ_D, a); return true;}
-static bool trans_xvfrintrp_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVFRINTRP_S, a); return true;}
-static bool trans_xvfrintrp_d(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVFRINTRP_D, a); return true;}
-static bool trans_xvfrintrm_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVFRINTRM_S, a); return true;}
-static bool trans_xvfrintrm_d(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVFRINTRM_D, a); return true;}
-static bool trans_xvfrint_s(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_XVFRINT_S, a); return true;}
-static bool trans_xvfrint_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(LA_INST_XVFRINT_D, a); return true;}
-static bool trans_xvftintrne_w_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(LA_INST_XVFTINTRNE_W_S, a); return true;}
-static bool trans_xvftintrne_l_d(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(LA_INST_XVFTINTRNE_L_D, a); return true;}
-static bool trans_xvftintrz_w_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_XVFTINTRZ_W_S, a); return true;}
-static bool trans_xvftintrz_l_d(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_XVFTINTRZ_L_D, a); return true;}
-static bool trans_xvftintrp_w_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_XVFTINTRP_W_S, a); return true;}
-static bool trans_xvftintrp_l_d(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_XVFTINTRP_L_D, a); return true;}
-static bool trans_xvftintrm_w_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_XVFTINTRM_W_S, a); return true;}
-static bool trans_xvftintrm_l_d(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(LA_INST_XVFTINTRM_L_D, a); return true;}
-static bool trans_xvftint_w_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVFTINT_W_S, a); return true;}
-static bool trans_xvftint_l_d(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVFTINT_L_D, a); return true;}
-static bool trans_xvftintrz_wu_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(LA_INST_XVFTINTRZ_WU_S, a); return true;}
-static bool trans_xvftintrz_lu_d(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(LA_INST_XVFTINTRZ_LU_D, a); return true;}
-static bool trans_xvftint_wu_s(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVFTINT_WU_S, a); return true;}
-static bool trans_xvftint_lu_d(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVFTINT_LU_D, a); return true;}
-static bool trans_xvftintrne_w_d(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(LA_INST_XVFTINTRNE_W_D, a); return true;}
-static bool trans_xvftintrz_w_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVFTINTRZ_W_D, a); return true;}
-static bool trans_xvftintrp_w_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVFTINTRP_W_D, a); return true;}
-static bool trans_xvftintrm_w_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(LA_INST_XVFTINTRM_W_D, a); return true;}
-static bool trans_xvftint_w_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVFTINT_W_D, a); return true;}
-static bool trans_xvftintrnel_l_s(DisasContext *ctx, arg_vv *a)      {handle_arg_vv(LA_INST_XVFTINTRNEL_L_S, a); return true;}
-static bool trans_xvftintrneh_l_s(DisasContext *ctx, arg_vv *a)      {handle_arg_vv(LA_INST_XVFTINTRNEH_L_S, a); return true;}
-static bool trans_xvftintrzl_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(LA_INST_XVFTINTRZL_L_S, a); return true;}
-static bool trans_xvftintrzh_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(LA_INST_XVFTINTRZH_L_S, a); return true;}
-static bool trans_xvftintrpl_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(LA_INST_XVFTINTRPL_L_S, a); return true;}
-static bool trans_xvftintrph_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(LA_INST_XVFTINTRPH_L_S, a); return true;}
-static bool trans_xvftintrml_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(LA_INST_XVFTINTRML_L_S, a); return true;}
-static bool trans_xvftintrmh_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(LA_INST_XVFTINTRMH_L_S, a); return true;}
-static bool trans_xvftintl_l_s(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVFTINTL_L_S, a); return true;}
-static bool trans_xvftinth_l_s(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVFTINTH_L_S, a); return true;}
-static bool trans_xvffint_s_w(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVFFINT_S_W, a); return true;}
-static bool trans_xvffint_d_l(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVFFINT_D_L, a); return true;}
-static bool trans_xvffint_s_wu(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVFFINT_S_WU, a); return true;}
-static bool trans_xvffint_d_lu(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVFFINT_D_LU, a); return true;}
-static bool trans_xvffintl_d_w(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVFFINTL_D_W, a); return true;}
-static bool trans_xvffinth_d_w(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(LA_INST_XVFFINTH_D_W, a); return true;}
-static bool trans_xvffint_s_l(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(LA_INST_XVFFINT_S_L, a); return true;}
-static bool trans_xvseq_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSEQ_B, a); return true;}
-static bool trans_xvseq_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSEQ_H, a); return true;}
-static bool trans_xvseq_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSEQ_W, a); return true;}
-static bool trans_xvseq_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSEQ_D, a); return true;}
-static bool trans_xvseqi_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSEQI_B, a); return true;}
-static bool trans_xvseqi_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSEQI_H, a); return true;}
-static bool trans_xvseqi_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSEQI_W, a); return true;}
-static bool trans_xvseqi_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSEQI_D, a); return true;}
-static bool trans_xvsle_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSLE_B, a); return true;}
-static bool trans_xvsle_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSLE_H, a); return true;}
-static bool trans_xvsle_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSLE_W, a); return true;}
-static bool trans_xvsle_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSLE_D, a); return true;}
-static bool trans_xvslei_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSLEI_B, a); return true;}
-static bool trans_xvslei_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSLEI_H, a); return true;}
-static bool trans_xvslei_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSLEI_W, a); return true;}
-static bool trans_xvslei_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSLEI_D, a); return true;}
-static bool trans_xvsle_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSLE_BU, a); return true;}
-static bool trans_xvsle_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSLE_HU, a); return true;}
-static bool trans_xvsle_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSLE_WU, a); return true;}
-static bool trans_xvsle_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSLE_DU, a); return true;}
-static bool trans_xvslei_bu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSLEI_BU, a); return true;}
-static bool trans_xvslei_hu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSLEI_HU, a); return true;}
-static bool trans_xvslei_wu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSLEI_WU, a); return true;}
-static bool trans_xvslei_du(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSLEI_DU, a); return true;}
-static bool trans_xvslt_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSLT_B, a); return true;}
-static bool trans_xvslt_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSLT_H, a); return true;}
-static bool trans_xvslt_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSLT_W, a); return true;}
-static bool trans_xvslt_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(LA_INST_XVSLT_D, a); return true;}
-static bool trans_xvslti_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSLTI_B, a); return true;}
-static bool trans_xvslti_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSLTI_H, a); return true;}
-static bool trans_xvslti_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSLTI_W, a); return true;}
-static bool trans_xvslti_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVSLTI_D, a); return true;}
-static bool trans_xvslt_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSLT_BU, a); return true;}
-static bool trans_xvslt_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSLT_HU, a); return true;}
-static bool trans_xvslt_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSLT_WU, a); return true;}
-static bool trans_xvslt_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSLT_DU, a); return true;}
-static bool trans_xvslti_bu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSLTI_BU, a); return true;}
-static bool trans_xvslti_hu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSLTI_HU, a); return true;}
-static bool trans_xvslti_wu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSLTI_WU, a); return true;}
-static bool trans_xvslti_du(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVSLTI_DU, a); return true;}
-static bool trans_xvfcmp_cond_s(DisasContext *ctx, arg_vvv_fcond *a) {handle_arg_vvv_fcond(LA_INST_XVFCMP_COND_S, a); return true;}
-static bool trans_xvfcmp_cond_d(DisasContext *ctx, arg_vvv_fcond *a) {handle_arg_vvv_fcond(LA_INST_XVFCMP_COND_D, a); return true;}
-static bool trans_xvbitsel_v(DisasContext *ctx, arg_vvvv *a)         {handle_arg_vvvv(LA_INST_XVBITSEL_V, a); return true;}
-static bool trans_xvbitseli_b(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVBITSELI_B, a); return true;}
-static bool trans_xvseteqz_v(DisasContext *ctx, arg_cv *a)           {handle_arg_cv(LA_INST_XVSETEQZ_V, a); return true;}
-static bool trans_xvsetnez_v(DisasContext *ctx, arg_cv *a)           {handle_arg_cv(LA_INST_XVSETNEZ_V, a); return true;}
-static bool trans_xvsetanyeqz_b(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(LA_INST_XVSETANYEQZ_B, a); return true;}
-static bool trans_xvsetanyeqz_h(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(LA_INST_XVSETANYEQZ_H, a); return true;}
-static bool trans_xvsetanyeqz_w(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(LA_INST_XVSETANYEQZ_W, a); return true;}
-static bool trans_xvsetanyeqz_d(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(LA_INST_XVSETANYEQZ_D, a); return true;}
-static bool trans_xvsetallnez_b(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(LA_INST_XVSETALLNEZ_B, a); return true;}
-static bool trans_xvsetallnez_h(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(LA_INST_XVSETALLNEZ_H, a); return true;}
-static bool trans_xvsetallnez_w(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(LA_INST_XVSETALLNEZ_W, a); return true;}
-static bool trans_xvsetallnez_d(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(LA_INST_XVSETALLNEZ_D, a); return true;}
-static bool trans_xvinsgr2vr_w(DisasContext *ctx, arg_vr_i *a)       {handle_arg_vr_i(LA_INST_XVINSGR2VR_W, a); return true;}
-static bool trans_xvinsgr2vr_d(DisasContext *ctx, arg_vr_i *a)       {handle_arg_vr_i(LA_INST_XVINSGR2VR_D, a); return true;}
-static bool trans_xvpickve2gr_w(DisasContext *ctx, arg_rv_i *a)      {handle_arg_rv_i(LA_INST_XVPICKVE2GR_W, a); return true;}
-static bool trans_xvpickve2gr_d(DisasContext *ctx, arg_rv_i *a)      {handle_arg_rv_i(LA_INST_XVPICKVE2GR_D, a); return true;}
-static bool trans_xvpickve2gr_wu(DisasContext *ctx, arg_rv_i *a)     {handle_arg_rv_i(LA_INST_XVPICKVE2GR_WU, a); return true;}
-static bool trans_xvpickve2gr_du(DisasContext *ctx, arg_rv_i *a)     {handle_arg_rv_i(LA_INST_XVPICKVE2GR_DU, a); return true;}
-static bool trans_xvreplgr2vr_b(DisasContext *ctx, arg_vr *a)        {handle_arg_vr(LA_INST_XVREPLGR2VR_B, a); return true;}
-static bool trans_xvreplgr2vr_h(DisasContext *ctx, arg_vr *a)        {handle_arg_vr(LA_INST_XVREPLGR2VR_H, a); return true;}
-static bool trans_xvreplgr2vr_w(DisasContext *ctx, arg_vr *a)        {handle_arg_vr(LA_INST_XVREPLGR2VR_W, a); return true;}
-static bool trans_xvreplgr2vr_d(DisasContext *ctx, arg_vr *a)        {handle_arg_vr(LA_INST_XVREPLGR2VR_D, a); return true;}
-static bool trans_xvreplve_b(DisasContext *ctx, arg_vvr *a)          {handle_arg_vvr(LA_INST_XVREPLVE_B, a); return true;}
-static bool trans_xvreplve_h(DisasContext *ctx, arg_vvr *a)          {handle_arg_vvr(LA_INST_XVREPLVE_H, a); return true;}
-static bool trans_xvreplve_w(DisasContext *ctx, arg_vvr *a)          {handle_arg_vvr(LA_INST_XVREPLVE_W, a); return true;}
-static bool trans_xvreplve_d(DisasContext *ctx, arg_vvr *a)          {handle_arg_vvr(LA_INST_XVREPLVE_D, a); return true;}
-static bool trans_xvrepl128vei_b(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVREPL128VEI_B, a); return true;}
-static bool trans_xvrepl128vei_h(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVREPL128VEI_H, a); return true;}
-static bool trans_xvrepl128vei_w(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVREPL128VEI_W, a); return true;}
-static bool trans_xvrepl128vei_d(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(LA_INST_XVREPL128VEI_D, a); return true;}
-static bool trans_xvreplve0_b(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVREPLVE0_B, a); return true;}
-static bool trans_xvreplve0_h(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVREPLVE0_H, a); return true;}
-static bool trans_xvreplve0_w(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVREPLVE0_W, a); return true;}
-static bool trans_xvreplve0_d(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVREPLVE0_D, a); return true;}
-static bool trans_xvreplve0_q(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(LA_INST_XVREPLVE0_Q, a); return true;}
-static bool trans_xvinsve0_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_XVINSVE0_W, a); return true;}
-static bool trans_xvinsve0_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_XVINSVE0_D, a); return true;}
-static bool trans_xvpickve_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_XVPICKVE_W, a); return true;}
-static bool trans_xvpickve_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_XVPICKVE_D, a); return true;}
-static bool trans_xvbsll_v(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVBSLL_V, a); return true;}
-static bool trans_xvbsrl_v(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(LA_INST_XVBSRL_V, a); return true;}
-static bool trans_xvpackev_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPACKEV_B, a); return true;}
-static bool trans_xvpackev_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPACKEV_H, a); return true;}
-static bool trans_xvpackev_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPACKEV_W, a); return true;}
-static bool trans_xvpackev_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPACKEV_D, a); return true;}
-static bool trans_xvpackod_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPACKOD_B, a); return true;}
-static bool trans_xvpackod_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPACKOD_H, a); return true;}
-static bool trans_xvpackod_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPACKOD_W, a); return true;}
-static bool trans_xvpackod_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPACKOD_D, a); return true;}
-static bool trans_xvpickev_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPICKEV_B, a); return true;}
-static bool trans_xvpickev_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPICKEV_H, a); return true;}
-static bool trans_xvpickev_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPICKEV_W, a); return true;}
-static bool trans_xvpickev_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPICKEV_D, a); return true;}
-static bool trans_xvpickod_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPICKOD_B, a); return true;}
-static bool trans_xvpickod_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPICKOD_H, a); return true;}
-static bool trans_xvpickod_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPICKOD_W, a); return true;}
-static bool trans_xvpickod_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(LA_INST_XVPICKOD_D, a); return true;}
-static bool trans_xvilvl_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVILVL_B, a); return true;}
-static bool trans_xvilvl_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVILVL_H, a); return true;}
-static bool trans_xvilvl_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVILVL_W, a); return true;}
-static bool trans_xvilvl_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVILVL_D, a); return true;}
-static bool trans_xvilvh_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVILVH_B, a); return true;}
-static bool trans_xvilvh_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVILVH_H, a); return true;}
-static bool trans_xvilvh_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVILVH_W, a); return true;}
-static bool trans_xvilvh_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVILVH_D, a); return true;}
-static bool trans_xvshuf_b(DisasContext *ctx, arg_vvvv *a)           {handle_arg_vvvv(LA_INST_XVSHUF_B, a); return true;}
-static bool trans_xvshuf_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSHUF_H, a); return true;}
-static bool trans_xvshuf_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSHUF_W, a); return true;}
-static bool trans_xvshuf_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVSHUF_D, a); return true;}
-static bool trans_xvperm_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(LA_INST_XVPERM_W, a); return true;}
-static bool trans_xvshuf4i_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_XVSHUF4I_B, a); return true;}
-static bool trans_xvshuf4i_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_XVSHUF4I_H, a); return true;}
-static bool trans_xvshuf4i_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_XVSHUF4I_W, a); return true;}
-static bool trans_xvshuf4i_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(LA_INST_XVSHUF4I_D, a); return true;}
-static bool trans_xvpermi_w(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVPERMI_W, a); return true;}
-static bool trans_xvpermi_d(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVPERMI_D, a); return true;}
-static bool trans_xvpermi_q(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(LA_INST_XVPERMI_Q, a); return true;}
-static bool trans_xvextrins_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVEXTRINS_D, a); return true;}
-static bool trans_xvextrins_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVEXTRINS_W, a); return true;}
-static bool trans_xvextrins_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVEXTRINS_H, a); return true;}
-static bool trans_xvextrins_b(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(LA_INST_XVEXTRINS_B, a); return true;}
-static bool trans_xvld(DisasContext *ctx, arg_vr_i *a)               {handle_arg_vr_i(LA_INST_XVLD, a); return true;}
-static bool trans_xvst(DisasContext *ctx, arg_vr_i *a)               {handle_arg_vr_i(LA_INST_XVST, a); return true;}
-static bool trans_xvldx(DisasContext *ctx, arg_vrr *a)               {handle_arg_vrr(LA_INST_XVLDX, a); return true;}
-static bool trans_xvstx(DisasContext *ctx, arg_vrr *a)               {handle_arg_vrr(LA_INST_XVSTX, a); return true;}
-static bool trans_xvldrepl_d(DisasContext *ctx, arg_vr_i *a)         {handle_arg_vr_i(LA_INST_XVLDREPL_D, a); return true;}
-static bool trans_xvldrepl_w(DisasContext *ctx, arg_vr_i *a)         {handle_arg_vr_i(LA_INST_XVLDREPL_W, a); return true;}
-static bool trans_xvldrepl_h(DisasContext *ctx, arg_vr_i *a)         {handle_arg_vr_i(LA_INST_XVLDREPL_H, a); return true;}
-static bool trans_xvldrepl_b(DisasContext *ctx, arg_vr_i *a)         {handle_arg_vr_i(LA_INST_XVLDREPL_B, a); return true;}
-static bool trans_xvstelm_d(DisasContext *ctx, arg_vr_ii *a)         {handle_arg_vr_ii(LA_INST_XVSTELM_D, a); return true;}
-static bool trans_xvstelm_w(DisasContext *ctx, arg_vr_ii *a)         {handle_arg_vr_ii(LA_INST_XVSTELM_W, a); return true;}
-static bool trans_xvstelm_h(DisasContext *ctx, arg_vr_ii *a)         {handle_arg_vr_ii(LA_INST_XVSTELM_H, a); return true;}
-static bool trans_xvstelm_b(DisasContext *ctx, arg_vr_ii *a)         {handle_arg_vr_ii(LA_INST_XVSTELM_B, a); return true;}
+static bool trans_add_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_ADD_W); return true;}
+static bool trans_add_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_ADD_D); return true;}
+static bool trans_sub_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_SUB_W); return true;}
+static bool trans_sub_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_SUB_D); return true;}
+static bool trans_slt(DisasContext *ctx, arg_rrr *a)                 {handle_arg_rrr(ctx, a, LA_INST_SLT); return true;}
+static bool trans_sltu(DisasContext *ctx, arg_rrr *a)                {handle_arg_rrr(ctx, a, LA_INST_SLTU); return true;}
+static bool trans_slti(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_SLTI); return true;}
+static bool trans_sltui(DisasContext *ctx, arg_rr_i *a)              {handle_arg_rr_i(ctx, a, LA_INST_SLTUI); return true;}
+static bool trans_nor(DisasContext *ctx, arg_rrr *a)                 {handle_arg_rrr(ctx, a, LA_INST_NOR); return true;}
+static bool trans_and(DisasContext *ctx, arg_rrr *a)                 {handle_arg_rrr(ctx, a, LA_INST_AND); return true;}
+static bool trans_or(DisasContext *ctx, arg_rrr *a)                  {handle_arg_rrr(ctx, a, LA_INST_OR); return true;}
+static bool trans_xor(DisasContext *ctx, arg_rrr *a)                 {handle_arg_rrr(ctx, a, LA_INST_XOR); return true;}
+static bool trans_orn(DisasContext *ctx, arg_rrr *a)                 {handle_arg_rrr(ctx, a, LA_INST_ORN); return true;}
+static bool trans_andn(DisasContext *ctx, arg_rrr *a)                {handle_arg_rrr(ctx, a, LA_INST_ANDN); return true;}
+static bool trans_mul_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_MUL_W); return true;}
+static bool trans_mulh_w(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_MULH_W); return true;}
+static bool trans_mulh_wu(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(ctx, a, LA_INST_MULH_WU); return true;}
+static bool trans_mul_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_MUL_D); return true;}
+static bool trans_mulh_d(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_MULH_D); return true;}
+static bool trans_mulh_du(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(ctx, a, LA_INST_MULH_DU); return true;}
+static bool trans_mulw_d_w(DisasContext *ctx, arg_rrr *a)            {handle_arg_rrr(ctx, a, LA_INST_MULW_D_W); return true;}
+static bool trans_mulw_d_wu(DisasContext *ctx, arg_rrr *a)           {handle_arg_rrr(ctx, a, LA_INST_MULW_D_WU); return true;}
+static bool trans_div_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_DIV_W); return true;}
+static bool trans_mod_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_MOD_W); return true;}
+static bool trans_div_wu(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_DIV_WU); return true;}
+static bool trans_mod_wu(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_MOD_WU); return true;}
+static bool trans_div_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_DIV_D); return true;}
+static bool trans_mod_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_MOD_D); return true;}
+static bool trans_div_du(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_DIV_DU); return true;}
+static bool trans_mod_du(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_MOD_DU); return true;}
+static bool trans_alsl_w(DisasContext *ctx, arg_rrr_sa *a)           {handle_arg_rrr_sa(ctx, a, LA_INST_ALSL_W); return true;}
+static bool trans_alsl_wu(DisasContext *ctx, arg_rrr_sa *a)          {handle_arg_rrr_sa(ctx, a, LA_INST_ALSL_WU); return true;}
+static bool trans_alsl_d(DisasContext *ctx, arg_rrr_sa *a)           {handle_arg_rrr_sa(ctx, a, LA_INST_ALSL_D); return true;}
+static bool trans_lu12i_w(DisasContext *ctx, arg_r_i *a)             {handle_arg_r_i(ctx, a, LA_INST_LU12I_W); return true;}
+static bool trans_lu32i_d(DisasContext *ctx, arg_r_i *a)             {handle_arg_r_i(ctx, a, LA_INST_LU32I_D); return true;}
+static bool trans_lu52i_d(DisasContext *ctx, arg_rr_i *a)            {handle_arg_rr_i(ctx, a, LA_INST_LU52I_D); return true;}
+static bool trans_pcaddi(DisasContext *ctx, arg_r_i *a)              {handle_arg_r_i(ctx, a, LA_INST_PCADDI); return true;}
+static bool trans_pcalau12i(DisasContext *ctx, arg_r_i *a)           {handle_arg_r_i(ctx, a, LA_INST_PCALAU12I); return true;}
+static bool trans_pcaddu12i(DisasContext *ctx, arg_r_i *a)           {handle_arg_r_i(ctx, a, LA_INST_PCADDU12I); return true;}
+static bool trans_pcaddu18i(DisasContext *ctx, arg_r_i *a)           {handle_arg_r_i(ctx, a, LA_INST_PCADDU18I); return true;}
+static bool trans_addi_w(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(ctx, a, LA_INST_ADDI_W); return true;}
+static bool trans_addi_d(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(ctx, a, LA_INST_ADDI_D); return true;}
+static bool trans_addu16i_d(DisasContext *ctx, arg_rr_i *a)          {handle_arg_rr_i(ctx, a, LA_INST_ADDU16I_D); return true;}
+static bool trans_andi(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_ANDI); return true;}
+static bool trans_ori(DisasContext *ctx, arg_rr_i *a)                {handle_arg_rr_i(ctx, a, LA_INST_ORI); return true;}
+static bool trans_xori(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_XORI); return true;}
+static bool trans_sll_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_SLL_W); return true;}
+static bool trans_srl_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_SRL_W); return true;}
+static bool trans_sra_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_SRA_W); return true;}
+static bool trans_sll_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_SLL_D); return true;}
+static bool trans_srl_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_SRL_D); return true;}
+static bool trans_sra_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_SRA_D); return true;}
+static bool trans_rotr_w(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_ROTR_W); return true;}
+static bool trans_rotr_d(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_ROTR_D); return true;}
+static bool trans_slli_w(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(ctx, a, LA_INST_SLLI_W); return true;}
+static bool trans_slli_d(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(ctx, a, LA_INST_SLLI_D); return true;}
+static bool trans_srli_w(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(ctx, a, LA_INST_SRLI_W); return true;}
+static bool trans_srli_d(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(ctx, a, LA_INST_SRLI_D); return true;}
+static bool trans_srai_w(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(ctx, a, LA_INST_SRAI_W); return true;}
+static bool trans_srai_d(DisasContext *ctx, arg_rr_i *a)             {handle_arg_rr_i(ctx, a, LA_INST_SRAI_D); return true;}
+static bool trans_rotri_w(DisasContext *ctx, arg_rr_i *a)            {handle_arg_rr_i(ctx, a, LA_INST_ROTRI_W); return true;}
+static bool trans_rotri_d(DisasContext *ctx, arg_rr_i *a)            {handle_arg_rr_i(ctx, a, LA_INST_ROTRI_D); return true;}
+static bool trans_ext_w_h(DisasContext *ctx, arg_rr *a)              {handle_arg_rr(ctx, a, LA_INST_EXT_W_H); return true;}
+static bool trans_ext_w_b(DisasContext *ctx, arg_rr *a)              {handle_arg_rr(ctx, a, LA_INST_EXT_W_B); return true;}
+static bool trans_clo_w(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(ctx, a, LA_INST_CLO_W); return true;}
+static bool trans_clz_w(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(ctx, a, LA_INST_CLZ_W); return true;}
+static bool trans_cto_w(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(ctx, a, LA_INST_CTO_W); return true;}
+static bool trans_ctz_w(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(ctx, a, LA_INST_CTZ_W); return true;}
+static bool trans_clo_d(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(ctx, a, LA_INST_CLO_D); return true;}
+static bool trans_clz_d(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(ctx, a, LA_INST_CLZ_D); return true;}
+static bool trans_cto_d(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(ctx, a, LA_INST_CTO_D); return true;}
+static bool trans_ctz_d(DisasContext *ctx, arg_rr *a)                {handle_arg_rr(ctx, a, LA_INST_CTZ_D); return true;}
+static bool trans_revb_2h(DisasContext *ctx, arg_rr *a)              {handle_arg_rr(ctx, a, LA_INST_REVB_2H); return true;}
+static bool trans_revb_4h(DisasContext *ctx, arg_rr *a)              {handle_arg_rr(ctx, a, LA_INST_REVB_4H); return true;}
+static bool trans_revb_2w(DisasContext *ctx, arg_rr *a)              {handle_arg_rr(ctx, a, LA_INST_REVB_2W); return true;}
+static bool trans_revb_d(DisasContext *ctx, arg_rr *a)               {handle_arg_rr(ctx, a, LA_INST_REVB_D); return true;}
+static bool trans_revh_2w(DisasContext *ctx, arg_rr *a)              {handle_arg_rr(ctx, a, LA_INST_REVH_2W); return true;}
+static bool trans_revh_d(DisasContext *ctx, arg_rr *a)               {handle_arg_rr(ctx, a, LA_INST_REVH_D); return true;}
+static bool trans_bitrev_4b(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(ctx, a, LA_INST_BITREV_4B); return true;}
+static bool trans_bitrev_8b(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(ctx, a, LA_INST_BITREV_8B); return true;}
+static bool trans_bitrev_w(DisasContext *ctx, arg_rr *a)             {handle_arg_rr(ctx, a, LA_INST_BITREV_W); return true;}
+static bool trans_bitrev_d(DisasContext *ctx, arg_rr *a)             {handle_arg_rr(ctx, a, LA_INST_BITREV_D); return true;}
+static bool trans_bytepick_w(DisasContext *ctx, arg_rrr_sa *a)       {handle_arg_rrr_sa(ctx, a, LA_INST_BYTEPICK_W); return true;}
+static bool trans_bytepick_d(DisasContext *ctx, arg_rrr_sa *a)       {handle_arg_rrr_sa(ctx, a, LA_INST_BYTEPICK_D); return true;}
+static bool trans_maskeqz(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(ctx, a, LA_INST_MASKEQZ); return true;}
+static bool trans_masknez(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(ctx, a, LA_INST_MASKNEZ); return true;}
+static bool trans_bstrins_w(DisasContext *ctx, arg_rr_ms_ls *a)      {handle_arg_rr_ms_ls(ctx, a, LA_INST_BSTRINS_W); return true;}
+static bool trans_bstrpick_w(DisasContext *ctx, arg_rr_ms_ls *a)     {handle_arg_rr_ms_ls(ctx, a, LA_INST_BSTRPICK_W); return true;}
+static bool trans_bstrins_d(DisasContext *ctx, arg_rr_ms_ls *a)      {handle_arg_rr_ms_ls(ctx, a, LA_INST_BSTRINS_D); return true;}
+static bool trans_bstrpick_d(DisasContext *ctx, arg_rr_ms_ls *a)     {handle_arg_rr_ms_ls(ctx, a, LA_INST_BSTRPICK_D); return true;}
+static bool trans_ld_b(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_LD_B); return true;}
+static bool trans_ld_h(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_LD_H); return true;}
+static bool trans_ld_w(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_LD_W); return true;}
+static bool trans_ld_d(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_LD_D); return true;}
+static bool trans_st_b(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_ST_B); return true;}
+static bool trans_st_h(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_ST_H); return true;}
+static bool trans_st_w(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_ST_W); return true;}
+static bool trans_st_d(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_ST_D); return true;}
+static bool trans_ld_bu(DisasContext *ctx, arg_rr_i *a)              {handle_arg_rr_i(ctx, a, LA_INST_LD_BU); return true;}
+static bool trans_ld_hu(DisasContext *ctx, arg_rr_i *a)              {handle_arg_rr_i(ctx, a, LA_INST_LD_HU); return true;}
+static bool trans_ld_wu(DisasContext *ctx, arg_rr_i *a)              {handle_arg_rr_i(ctx, a, LA_INST_LD_WU); return true;}
+static bool trans_ldx_b(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_LDX_B); return true;}
+static bool trans_ldx_h(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_LDX_H); return true;}
+static bool trans_ldx_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_LDX_W); return true;}
+static bool trans_ldx_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_LDX_D); return true;}
+static bool trans_stx_b(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_STX_B); return true;}
+static bool trans_stx_h(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_STX_H); return true;}
+static bool trans_stx_w(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_STX_W); return true;}
+static bool trans_stx_d(DisasContext *ctx, arg_rrr *a)               {handle_arg_rrr(ctx, a, LA_INST_STX_D); return true;}
+static bool trans_ldx_bu(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_LDX_BU); return true;}
+static bool trans_ldx_hu(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_LDX_HU); return true;}
+static bool trans_ldx_wu(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_LDX_WU); return true;}
+static bool trans_preld(DisasContext *ctx, arg_hint_r_i *a)          {handle_arg_hint_r_i(ctx, a, LA_INST_PRELD); return true;}
+static bool trans_preldx(DisasContext *ctx, arg_hint_rr *a)          {handle_arg_hint_rr(ctx, a, LA_INST_PRELDX); return true;}
+static bool trans_dbar(DisasContext *ctx, arg_i *a)                  {handle_arg_i(ctx, a, LA_INST_DBAR); return true;}
+static bool trans_ibar(DisasContext *ctx, arg_i *a)                  {handle_arg_i(ctx, a, LA_INST_IBAR); return true;}
+static bool trans_ldptr_w(DisasContext *ctx, arg_rr_i *a)            {handle_arg_rr_i(ctx, a, LA_INST_LDPTR_W); return true;}
+static bool trans_stptr_w(DisasContext *ctx, arg_rr_i *a)            {handle_arg_rr_i(ctx, a, LA_INST_STPTR_W); return true;}
+static bool trans_ldptr_d(DisasContext *ctx, arg_rr_i *a)            {handle_arg_rr_i(ctx, a, LA_INST_LDPTR_D); return true;}
+static bool trans_stptr_d(DisasContext *ctx, arg_rr_i *a)            {handle_arg_rr_i(ctx, a, LA_INST_STPTR_D); return true;}
+static bool trans_ldgt_b(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_LDGT_B); return true;}
+static bool trans_ldgt_h(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_LDGT_H); return true;}
+static bool trans_ldgt_w(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_LDGT_W); return true;}
+static bool trans_ldgt_d(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_LDGT_D); return true;}
+static bool trans_ldle_b(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_LDLE_B); return true;}
+static bool trans_ldle_h(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_LDLE_H); return true;}
+static bool trans_ldle_w(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_LDLE_W); return true;}
+static bool trans_ldle_d(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_LDLE_D); return true;}
+static bool trans_stgt_b(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_STGT_B); return true;}
+static bool trans_stgt_h(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_STGT_H); return true;}
+static bool trans_stgt_w(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_STGT_W); return true;}
+static bool trans_stgt_d(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_STGT_D); return true;}
+static bool trans_stle_b(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_STLE_B); return true;}
+static bool trans_stle_h(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_STLE_H); return true;}
+static bool trans_stle_w(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_STLE_W); return true;}
+static bool trans_stle_d(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_STLE_D); return true;}
+static bool trans_ll_w(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_LL_W); return true;}
+static bool trans_sc_w(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_SC_W); return true;}
+static bool trans_ll_d(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_LL_D); return true;}
+static bool trans_sc_d(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_SC_D); return true;}
+static bool trans_amswap_w(DisasContext *ctx, arg_rrr *a)            {handle_arg_rrr(ctx, a, LA_INST_AMSWAP_W); return true;}
+static bool trans_amswap_d(DisasContext *ctx, arg_rrr *a)            {handle_arg_rrr(ctx, a, LA_INST_AMSWAP_D); return true;}
+static bool trans_amadd_w(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(ctx, a, LA_INST_AMADD_W); return true;}
+static bool trans_amadd_d(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(ctx, a, LA_INST_AMADD_D); return true;}
+static bool trans_amand_w(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(ctx, a, LA_INST_AMAND_W); return true;}
+static bool trans_amand_d(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(ctx, a, LA_INST_AMAND_D); return true;}
+static bool trans_amor_w(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_AMOR_W); return true;}
+static bool trans_amor_d(DisasContext *ctx, arg_rrr *a)              {handle_arg_rrr(ctx, a, LA_INST_AMOR_D); return true;}
+static bool trans_amxor_w(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(ctx, a, LA_INST_AMXOR_W); return true;}
+static bool trans_amxor_d(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(ctx, a, LA_INST_AMXOR_D); return true;}
+static bool trans_ammax_w(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(ctx, a, LA_INST_AMMAX_W); return true;}
+static bool trans_ammax_d(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(ctx, a, LA_INST_AMMAX_D); return true;}
+static bool trans_ammin_w(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(ctx, a, LA_INST_AMMIN_W); return true;}
+static bool trans_ammin_d(DisasContext *ctx, arg_rrr *a)             {handle_arg_rrr(ctx, a, LA_INST_AMMIN_D); return true;}
+static bool trans_ammax_wu(DisasContext *ctx, arg_rrr *a)            {handle_arg_rrr(ctx, a, LA_INST_AMMAX_WU); return true;}
+static bool trans_ammax_du(DisasContext *ctx, arg_rrr *a)            {handle_arg_rrr(ctx, a, LA_INST_AMMAX_DU); return true;}
+static bool trans_ammin_wu(DisasContext *ctx, arg_rrr *a)            {handle_arg_rrr(ctx, a, LA_INST_AMMIN_WU); return true;}
+static bool trans_ammin_du(DisasContext *ctx, arg_rrr *a)            {handle_arg_rrr(ctx, a, LA_INST_AMMIN_DU); return true;}
+static bool trans_amswap_db_w(DisasContext *ctx, arg_rrr *a)         {handle_arg_rrr(ctx, a, LA_INST_AMSWAP_DB_W); return true;}
+static bool trans_amswap_db_d(DisasContext *ctx, arg_rrr *a)         {handle_arg_rrr(ctx, a, LA_INST_AMSWAP_DB_D); return true;}
+static bool trans_amadd_db_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(ctx, a, LA_INST_AMADD_DB_W); return true;}
+static bool trans_amadd_db_d(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(ctx, a, LA_INST_AMADD_DB_D); return true;}
+static bool trans_amand_db_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(ctx, a, LA_INST_AMAND_DB_W); return true;}
+static bool trans_amand_db_d(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(ctx, a, LA_INST_AMAND_DB_D); return true;}
+static bool trans_amor_db_w(DisasContext *ctx, arg_rrr *a)           {handle_arg_rrr(ctx, a, LA_INST_AMOR_DB_W); return true;}
+static bool trans_amor_db_d(DisasContext *ctx, arg_rrr *a)           {handle_arg_rrr(ctx, a, LA_INST_AMOR_DB_D); return true;}
+static bool trans_amxor_db_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(ctx, a, LA_INST_AMXOR_DB_W); return true;}
+static bool trans_amxor_db_d(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(ctx, a, LA_INST_AMXOR_DB_D); return true;}
+static bool trans_ammax_db_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(ctx, a, LA_INST_AMMAX_DB_W); return true;}
+static bool trans_ammax_db_d(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(ctx, a, LA_INST_AMMAX_DB_D); return true;}
+static bool trans_ammin_db_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(ctx, a, LA_INST_AMMIN_DB_W); return true;}
+static bool trans_ammin_db_d(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(ctx, a, LA_INST_AMMIN_DB_D); return true;}
+static bool trans_ammax_db_wu(DisasContext *ctx, arg_rrr *a)         {handle_arg_rrr(ctx, a, LA_INST_AMMAX_DB_WU); return true;}
+static bool trans_ammax_db_du(DisasContext *ctx, arg_rrr *a)         {handle_arg_rrr(ctx, a, LA_INST_AMMAX_DB_DU); return true;}
+static bool trans_ammin_db_wu(DisasContext *ctx, arg_rrr *a)         {handle_arg_rrr(ctx, a, LA_INST_AMMIN_DB_WU); return true;}
+static bool trans_ammin_db_du(DisasContext *ctx, arg_rrr *a)         {handle_arg_rrr(ctx, a, LA_INST_AMMIN_DB_DU); return true;}
+static bool trans_crc_w_b_w(DisasContext *ctx, arg_rrr *a)           {handle_arg_rrr(ctx, a, LA_INST_CRC_W_B_W); return true;}
+static bool trans_crc_w_h_w(DisasContext *ctx, arg_rrr *a)           {handle_arg_rrr(ctx, a, LA_INST_CRC_W_H_W); return true;}
+static bool trans_crc_w_w_w(DisasContext *ctx, arg_rrr *a)           {handle_arg_rrr(ctx, a, LA_INST_CRC_W_W_W); return true;}
+static bool trans_crc_w_d_w(DisasContext *ctx, arg_rrr *a)           {handle_arg_rrr(ctx, a, LA_INST_CRC_W_D_W); return true;}
+static bool trans_crcc_w_b_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(ctx, a, LA_INST_CRCC_W_B_W); return true;}
+static bool trans_crcc_w_h_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(ctx, a, LA_INST_CRCC_W_H_W); return true;}
+static bool trans_crcc_w_w_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(ctx, a, LA_INST_CRCC_W_W_W); return true;}
+static bool trans_crcc_w_d_w(DisasContext *ctx, arg_rrr *a)          {handle_arg_rrr(ctx, a, LA_INST_CRCC_W_D_W); return true;}
+static bool trans_break(DisasContext *ctx, arg_i *a)                 {handle_arg_i(ctx, a, LA_INST_BREAK); return true;}
+static bool trans_syscall(DisasContext *ctx, arg_i *a)               {handle_arg_i(ctx, a, LA_INST_SYSCALL); return true;}
+static bool trans_asrtle_d(DisasContext *ctx, arg_rr_jk *a)          {handle_arg_rr_jk(ctx, a, LA_INST_ASRTLE_D); return true;}
+static bool trans_asrtgt_d(DisasContext *ctx, arg_rr_jk *a)          {handle_arg_rr_jk(ctx, a, LA_INST_ASRTGT_D); return true;}
+static bool trans_rdtimel_w(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(ctx, a, LA_INST_RDTIMEL_W); return true;}
+static bool trans_rdtimeh_w(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(ctx, a, LA_INST_RDTIMEH_W); return true;}
+static bool trans_rdtime_d(DisasContext *ctx, arg_rr *a)             {handle_arg_rr(ctx, a, LA_INST_RDTIME_D); return true;}
+static bool trans_cpucfg(DisasContext *ctx, arg_rr *a)               {handle_arg_rr(ctx, a, LA_INST_CPUCFG); return true;}
+static bool trans_fadd_s(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(ctx, a, LA_INST_FADD_S); return true;}
+static bool trans_fadd_d(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(ctx, a, LA_INST_FADD_D); return true;}
+static bool trans_fsub_s(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(ctx, a, LA_INST_FSUB_S); return true;}
+static bool trans_fsub_d(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(ctx, a, LA_INST_FSUB_D); return true;}
+static bool trans_fmul_s(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(ctx, a, LA_INST_FMUL_S); return true;}
+static bool trans_fmul_d(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(ctx, a, LA_INST_FMUL_D); return true;}
+static bool trans_fdiv_s(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(ctx, a, LA_INST_FDIV_S); return true;}
+static bool trans_fdiv_d(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(ctx, a, LA_INST_FDIV_D); return true;}
+static bool trans_fmadd_s(DisasContext *ctx, arg_ffff *a)            {handle_arg_ffff(ctx, a, LA_INST_FMADD_S); return true;}
+static bool trans_fmadd_d(DisasContext *ctx, arg_ffff *a)            {handle_arg_ffff(ctx, a, LA_INST_FMADD_D); return true;}
+static bool trans_fmsub_s(DisasContext *ctx, arg_ffff *a)            {handle_arg_ffff(ctx, a, LA_INST_FMSUB_S); return true;}
+static bool trans_fmsub_d(DisasContext *ctx, arg_ffff *a)            {handle_arg_ffff(ctx, a, LA_INST_FMSUB_D); return true;}
+static bool trans_fnmadd_s(DisasContext *ctx, arg_ffff *a)           {handle_arg_ffff(ctx, a, LA_INST_FNMADD_S); return true;}
+static bool trans_fnmadd_d(DisasContext *ctx, arg_ffff *a)           {handle_arg_ffff(ctx, a, LA_INST_FNMADD_D); return true;}
+static bool trans_fnmsub_s(DisasContext *ctx, arg_ffff *a)           {handle_arg_ffff(ctx, a, LA_INST_FNMSUB_S); return true;}
+static bool trans_fnmsub_d(DisasContext *ctx, arg_ffff *a)           {handle_arg_ffff(ctx, a, LA_INST_FNMSUB_D); return true;}
+static bool trans_fmax_s(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(ctx, a, LA_INST_FMAX_S); return true;}
+static bool trans_fmax_d(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(ctx, a, LA_INST_FMAX_D); return true;}
+static bool trans_fmin_s(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(ctx, a, LA_INST_FMIN_S); return true;}
+static bool trans_fmin_d(DisasContext *ctx, arg_fff *a)              {handle_arg_fff(ctx, a, LA_INST_FMIN_D); return true;}
+static bool trans_fmaxa_s(DisasContext *ctx, arg_fff *a)             {handle_arg_fff(ctx, a, LA_INST_FMAXA_S); return true;}
+static bool trans_fmaxa_d(DisasContext *ctx, arg_fff *a)             {handle_arg_fff(ctx, a, LA_INST_FMAXA_D); return true;}
+static bool trans_fmina_s(DisasContext *ctx, arg_fff *a)             {handle_arg_fff(ctx, a, LA_INST_FMINA_S); return true;}
+static bool trans_fmina_d(DisasContext *ctx, arg_fff *a)             {handle_arg_fff(ctx, a, LA_INST_FMINA_D); return true;}
+static bool trans_fabs_s(DisasContext *ctx, arg_ff *a)               {handle_arg_ff(ctx, a, LA_INST_FABS_S); return true;}
+static bool trans_fabs_d(DisasContext *ctx, arg_ff *a)               {handle_arg_ff(ctx, a, LA_INST_FABS_D); return true;}
+static bool trans_fneg_s(DisasContext *ctx, arg_ff *a)               {handle_arg_ff(ctx, a, LA_INST_FNEG_S); return true;}
+static bool trans_fneg_d(DisasContext *ctx, arg_ff *a)               {handle_arg_ff(ctx, a, LA_INST_FNEG_D); return true;}
+static bool trans_fsqrt_s(DisasContext *ctx, arg_ff *a)              {handle_arg_ff(ctx, a, LA_INST_FSQRT_S); return true;}
+static bool trans_fsqrt_d(DisasContext *ctx, arg_ff *a)              {handle_arg_ff(ctx, a, LA_INST_FSQRT_D); return true;}
+static bool trans_frecip_s(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(ctx, a, LA_INST_FRECIP_S); return true;}
+static bool trans_frecip_d(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(ctx, a, LA_INST_FRECIP_D); return true;}
+static bool trans_frsqrt_s(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(ctx, a, LA_INST_FRSQRT_S); return true;}
+static bool trans_frsqrt_d(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(ctx, a, LA_INST_FRSQRT_D); return true;}
+static bool trans_fscaleb_s(DisasContext *ctx, arg_fff *a)           {handle_arg_fff(ctx, a, LA_INST_FSCALEB_S); return true;}
+static bool trans_fscaleb_d(DisasContext *ctx, arg_fff *a)           {handle_arg_fff(ctx, a, LA_INST_FSCALEB_D); return true;}
+static bool trans_flogb_s(DisasContext *ctx, arg_ff *a)              {handle_arg_ff(ctx, a, LA_INST_FLOGB_S); return true;}
+static bool trans_flogb_d(DisasContext *ctx, arg_ff *a)              {handle_arg_ff(ctx, a, LA_INST_FLOGB_D); return true;}
+static bool trans_fcopysign_s(DisasContext *ctx, arg_fff *a)         {handle_arg_fff(ctx, a, LA_INST_FCOPYSIGN_S); return true;}
+static bool trans_fcopysign_d(DisasContext *ctx, arg_fff *a)         {handle_arg_fff(ctx, a, LA_INST_FCOPYSIGN_D); return true;}
+static bool trans_fclass_s(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(ctx, a, LA_INST_FCLASS_S); return true;}
+static bool trans_fclass_d(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(ctx, a, LA_INST_FCLASS_D); return true;}
+static bool trans_fcmp_cond_s(DisasContext *ctx, arg_cff_fcond *a)   {handle_arg_cff_fcond(ctx, a, LA_INST_FCMP_COND_S); return true;}
+static bool trans_fcmp_cond_d(DisasContext *ctx, arg_cff_fcond *a)   {handle_arg_cff_fcond(ctx, a, LA_INST_FCMP_COND_D); return true;}
+static bool trans_fcvt_s_d(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(ctx, a, LA_INST_FCVT_S_D); return true;}
+static bool trans_fcvt_d_s(DisasContext *ctx, arg_ff *a)             {handle_arg_ff(ctx, a, LA_INST_FCVT_D_S); return true;}
+static bool trans_ftintrm_w_s(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(ctx, a, LA_INST_FTINTRM_W_S); return true;}
+static bool trans_ftintrm_w_d(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(ctx, a, LA_INST_FTINTRM_W_D); return true;}
+static bool trans_ftintrm_l_s(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(ctx, a, LA_INST_FTINTRM_L_S); return true;}
+static bool trans_ftintrm_l_d(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(ctx, a, LA_INST_FTINTRM_L_D); return true;}
+static bool trans_ftintrp_w_s(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(ctx, a, LA_INST_FTINTRP_W_S); return true;}
+static bool trans_ftintrp_w_d(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(ctx, a, LA_INST_FTINTRP_W_D); return true;}
+static bool trans_ftintrp_l_s(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(ctx, a, LA_INST_FTINTRP_L_S); return true;}
+static bool trans_ftintrp_l_d(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(ctx, a, LA_INST_FTINTRP_L_D); return true;}
+static bool trans_ftintrz_w_s(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(ctx, a, LA_INST_FTINTRZ_W_S); return true;}
+static bool trans_ftintrz_w_d(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(ctx, a, LA_INST_FTINTRZ_W_D); return true;}
+static bool trans_ftintrz_l_s(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(ctx, a, LA_INST_FTINTRZ_L_S); return true;}
+static bool trans_ftintrz_l_d(DisasContext *ctx, arg_ff *a)          {handle_arg_ff(ctx, a, LA_INST_FTINTRZ_L_D); return true;}
+static bool trans_ftintrne_w_s(DisasContext *ctx, arg_ff *a)         {handle_arg_ff(ctx, a, LA_INST_FTINTRNE_W_S); return true;}
+static bool trans_ftintrne_w_d(DisasContext *ctx, arg_ff *a)         {handle_arg_ff(ctx, a, LA_INST_FTINTRNE_W_D); return true;}
+static bool trans_ftintrne_l_s(DisasContext *ctx, arg_ff *a)         {handle_arg_ff(ctx, a, LA_INST_FTINTRNE_L_S); return true;}
+static bool trans_ftintrne_l_d(DisasContext *ctx, arg_ff *a)         {handle_arg_ff(ctx, a, LA_INST_FTINTRNE_L_D); return true;}
+static bool trans_ftint_w_s(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(ctx, a, LA_INST_FTINT_W_S); return true;}
+static bool trans_ftint_w_d(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(ctx, a, LA_INST_FTINT_W_D); return true;}
+static bool trans_ftint_l_s(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(ctx, a, LA_INST_FTINT_L_S); return true;}
+static bool trans_ftint_l_d(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(ctx, a, LA_INST_FTINT_L_D); return true;}
+static bool trans_ffint_s_w(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(ctx, a, LA_INST_FFINT_S_W); return true;}
+static bool trans_ffint_s_l(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(ctx, a, LA_INST_FFINT_S_L); return true;}
+static bool trans_ffint_d_w(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(ctx, a, LA_INST_FFINT_D_W); return true;}
+static bool trans_ffint_d_l(DisasContext *ctx, arg_ff *a)            {handle_arg_ff(ctx, a, LA_INST_FFINT_D_L); return true;}
+static bool trans_frint_s(DisasContext *ctx, arg_ff *a)              {handle_arg_ff(ctx, a, LA_INST_FRINT_S); return true;}
+static bool trans_frint_d(DisasContext *ctx, arg_ff *a)              {handle_arg_ff(ctx, a, LA_INST_FRINT_D); return true;}
+static bool trans_fmov_s(DisasContext *ctx, arg_ff *a)               {handle_arg_ff(ctx, a, LA_INST_FMOV_S); return true;}
+static bool trans_fmov_d(DisasContext *ctx, arg_ff *a)               {handle_arg_ff(ctx, a, LA_INST_FMOV_D); return true;}
+static bool trans_fsel(DisasContext *ctx, arg_fffc *a)               {handle_arg_fffc(ctx, a, LA_INST_FSEL); return true;}
+static bool trans_movgr2fr_w(DisasContext *ctx, arg_fr *a)           {handle_arg_fr(ctx, a, LA_INST_MOVGR2FR_W); return true;}
+static bool trans_movgr2fr_d(DisasContext *ctx, arg_fr *a)           {handle_arg_fr(ctx, a, LA_INST_MOVGR2FR_D); return true;}
+static bool trans_movgr2frh_w(DisasContext *ctx, arg_fr *a)          {handle_arg_fr(ctx, a, LA_INST_MOVGR2FRH_W); return true;}
+static bool trans_movfr2gr_s(DisasContext *ctx, arg_rf *a)           {handle_arg_rf(ctx, a, LA_INST_MOVFR2GR_S); return true;}
+static bool trans_movfr2gr_d(DisasContext *ctx, arg_rf *a)           {handle_arg_rf(ctx, a, LA_INST_MOVFR2GR_D); return true;}
+static bool trans_movfrh2gr_s(DisasContext *ctx, arg_rf *a)          {handle_arg_rf(ctx, a, LA_INST_MOVFRH2GR_S); return true;}
+static bool trans_movgr2fcsr(DisasContext *ctx, arg_fcsrd_r *a)      {handle_arg_fcsrd_r(ctx, a, LA_INST_MOVGR2FCSR); return true;}
+static bool trans_movfcsr2gr(DisasContext *ctx, arg_r_fcsrs *a)      {handle_arg_r_fcsrs(ctx, a, LA_INST_MOVFCSR2GR); return true;}
+static bool trans_movfr2cf(DisasContext *ctx, arg_cf *a)             {handle_arg_cf(ctx, a, LA_INST_MOVFR2CF); return true;}
+static bool trans_movcf2fr(DisasContext *ctx, arg_fc *a)             {handle_arg_fc(ctx, a, LA_INST_MOVCF2FR); return true;}
+static bool trans_movgr2cf(DisasContext *ctx, arg_cr *a)             {handle_arg_cr(ctx, a, LA_INST_MOVGR2CF); return true;}
+static bool trans_movcf2gr(DisasContext *ctx, arg_rc *a)             {handle_arg_rc(ctx, a, LA_INST_MOVCF2GR); return true;}
+static bool trans_fld_s(DisasContext *ctx, arg_fr_i *a)              {handle_arg_fr_i(ctx, a, LA_INST_FLD_S); return true;}
+static bool trans_fst_s(DisasContext *ctx, arg_fr_i *a)              {handle_arg_fr_i(ctx, a, LA_INST_FST_S); return true;}
+static bool trans_fld_d(DisasContext *ctx, arg_fr_i *a)              {handle_arg_fr_i(ctx, a, LA_INST_FLD_D); return true;}
+static bool trans_fst_d(DisasContext *ctx, arg_fr_i *a)              {handle_arg_fr_i(ctx, a, LA_INST_FST_D); return true;}
+static bool trans_fldx_s(DisasContext *ctx, arg_frr *a)              {handle_arg_frr(ctx, a, LA_INST_FLDX_S); return true;}
+static bool trans_fldx_d(DisasContext *ctx, arg_frr *a)              {handle_arg_frr(ctx, a, LA_INST_FLDX_D); return true;}
+static bool trans_fstx_s(DisasContext *ctx, arg_frr *a)              {handle_arg_frr(ctx, a, LA_INST_FSTX_S); return true;}
+static bool trans_fstx_d(DisasContext *ctx, arg_frr *a)              {handle_arg_frr(ctx, a, LA_INST_FSTX_D); return true;}
+static bool trans_fldgt_s(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(ctx, a, LA_INST_FLDGT_S); return true;}
+static bool trans_fldgt_d(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(ctx, a, LA_INST_FLDGT_D); return true;}
+static bool trans_fldle_s(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(ctx, a, LA_INST_FLDLE_S); return true;}
+static bool trans_fldle_d(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(ctx, a, LA_INST_FLDLE_D); return true;}
+static bool trans_fstgt_s(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(ctx, a, LA_INST_FSTGT_S); return true;}
+static bool trans_fstgt_d(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(ctx, a, LA_INST_FSTGT_D); return true;}
+static bool trans_fstle_s(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(ctx, a, LA_INST_FSTLE_S); return true;}
+static bool trans_fstle_d(DisasContext *ctx, arg_frr *a)             {handle_arg_frr(ctx, a, LA_INST_FSTLE_D); return true;}
+static bool trans_beqz(DisasContext *ctx, arg_r_offs *a)             {handle_arg_r_offs(ctx, a, LA_INST_BEQZ); return true;}
+static bool trans_bnez(DisasContext *ctx, arg_r_offs *a)             {handle_arg_r_offs(ctx, a, LA_INST_BNEZ); return true;}
+static bool trans_bceqz(DisasContext *ctx, arg_c_offs *a)            {handle_arg_c_offs(ctx, a, LA_INST_BCEQZ); return true;}
+static bool trans_bcnez(DisasContext *ctx, arg_c_offs *a)            {handle_arg_c_offs(ctx, a, LA_INST_BCNEZ); return true;}
+static bool trans_jirl(DisasContext *ctx, arg_rr_i *a)               {handle_arg_rr_i(ctx, a, LA_INST_JIRL); return true;}
+static bool trans_b(DisasContext *ctx, arg_offs *a)                  {handle_arg_offs(ctx, a, LA_INST_B); return true;}
+static bool trans_bl(DisasContext *ctx, arg_offs *a)                 {handle_arg_offs(ctx, a, LA_INST_BL); return true;}
+static bool trans_beq(DisasContext *ctx, arg_rr_offs *a)             {handle_arg_rr_offs(ctx, a, LA_INST_BEQ); return true;}
+static bool trans_bne(DisasContext *ctx, arg_rr_offs *a)             {handle_arg_rr_offs(ctx, a, LA_INST_BNE); return true;}
+static bool trans_blt(DisasContext *ctx, arg_rr_offs *a)             {handle_arg_rr_offs(ctx, a, LA_INST_BLT); return true;}
+static bool trans_bge(DisasContext *ctx, arg_rr_offs *a)             {handle_arg_rr_offs(ctx, a, LA_INST_BGE); return true;}
+static bool trans_bltu(DisasContext *ctx, arg_rr_offs *a)            {handle_arg_rr_offs(ctx, a, LA_INST_BLTU); return true;}
+static bool trans_bgeu(DisasContext *ctx, arg_rr_offs *a)            {handle_arg_rr_offs(ctx, a, LA_INST_BGEU); return true;}
+static bool trans_csrrd(DisasContext *ctx, arg_r_csr *a)             {handle_arg_r_csr(ctx, a, LA_INST_CSRRD); return true;}
+static bool trans_csrwr(DisasContext *ctx, arg_r_csr *a)             {handle_arg_r_csr(ctx, a, LA_INST_CSRWR); return true;}
+static bool trans_csrxchg(DisasContext *ctx, arg_rr_csr *a)          {handle_arg_rr_csr(ctx, a, LA_INST_CSRXCHG); return true;}
+static bool trans_iocsrrd_b(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(ctx, a, LA_INST_IOCSRRD_B); return true;}
+static bool trans_iocsrrd_h(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(ctx, a, LA_INST_IOCSRRD_H); return true;}
+static bool trans_iocsrrd_w(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(ctx, a, LA_INST_IOCSRRD_W); return true;}
+static bool trans_iocsrrd_d(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(ctx, a, LA_INST_IOCSRRD_D); return true;}
+static bool trans_iocsrwr_b(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(ctx, a, LA_INST_IOCSRWR_B); return true;}
+static bool trans_iocsrwr_h(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(ctx, a, LA_INST_IOCSRWR_H); return true;}
+static bool trans_iocsrwr_w(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(ctx, a, LA_INST_IOCSRWR_W); return true;}
+static bool trans_iocsrwr_d(DisasContext *ctx, arg_rr *a)            {handle_arg_rr(ctx, a, LA_INST_IOCSRWR_D); return true;}
+static bool trans_tlbsrch(DisasContext *ctx, arg_empty *a)           {handle_arg_empty(ctx, a, LA_INST_TLBSRCH); return true;}
+static bool trans_tlbrd(DisasContext *ctx, arg_empty *a)             {handle_arg_empty(ctx, a, LA_INST_TLBRD); return true;}
+static bool trans_tlbwr(DisasContext *ctx, arg_empty *a)             {handle_arg_empty(ctx, a, LA_INST_TLBWR); return true;}
+static bool trans_tlbfill(DisasContext *ctx, arg_empty *a)           {handle_arg_empty(ctx, a, LA_INST_TLBFILL); return true;}
+static bool trans_tlbclr(DisasContext *ctx, arg_empty *a)            {handle_arg_empty(ctx, a, LA_INST_TLBCLR); return true;}
+static bool trans_tlbflush(DisasContext *ctx, arg_empty *a)          {handle_arg_empty(ctx, a, LA_INST_TLBFLUSH); return true;}
+static bool trans_invtlb(DisasContext *ctx, arg_i_rr *a)             {handle_arg_i_rr(ctx, a, LA_INST_INVTLB); return true;}
+static bool trans_cacop(DisasContext *ctx, arg_cop_r_i *a)           {handle_arg_cop_r_i(ctx, a, LA_INST_CACOP); return true;}
+static bool trans_lddir(DisasContext *ctx, arg_rr_i *a)              {handle_arg_rr_i(ctx, a, LA_INST_LDDIR); return true;}
+static bool trans_ldpte(DisasContext *ctx, arg_j_i *a)               {handle_arg_j_i(ctx, a, LA_INST_LDPTE); return true;}
+static bool trans_ertn(DisasContext *ctx, arg_empty *a)              {handle_arg_empty(ctx, a, LA_INST_ERTN); return true;}
+static bool trans_idle(DisasContext *ctx, arg_i *a)                  {handle_arg_i(ctx, a, LA_INST_IDLE); return true;}
+static bool trans_dbcl(DisasContext *ctx, arg_i *a)                  {handle_arg_i(ctx, a, LA_INST_DBCL); return true;}
+static bool trans_vadd_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VADD_B); return true;}
+static bool trans_vadd_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VADD_H); return true;}
+static bool trans_vadd_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VADD_W); return true;}
+static bool trans_vadd_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VADD_D); return true;}
+static bool trans_vadd_q(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VADD_Q); return true;}
+static bool trans_vsub_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSUB_B); return true;}
+static bool trans_vsub_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSUB_H); return true;}
+static bool trans_vsub_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSUB_W); return true;}
+static bool trans_vsub_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSUB_D); return true;}
+static bool trans_vsub_q(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSUB_Q); return true;}
+static bool trans_vaddi_bu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VADDI_BU); return true;}
+static bool trans_vaddi_hu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VADDI_HU); return true;}
+static bool trans_vaddi_wu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VADDI_WU); return true;}
+static bool trans_vaddi_du(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VADDI_DU); return true;}
+static bool trans_vsubi_bu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSUBI_BU); return true;}
+static bool trans_vsubi_hu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSUBI_HU); return true;}
+static bool trans_vsubi_wu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSUBI_WU); return true;}
+static bool trans_vsubi_du(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSUBI_DU); return true;}
+static bool trans_vneg_b(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(ctx, a, LA_INST_VNEG_B); return true;}
+static bool trans_vneg_h(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(ctx, a, LA_INST_VNEG_H); return true;}
+static bool trans_vneg_w(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(ctx, a, LA_INST_VNEG_W); return true;}
+static bool trans_vneg_d(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(ctx, a, LA_INST_VNEG_D); return true;}
+static bool trans_vsadd_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSADD_B); return true;}
+static bool trans_vsadd_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSADD_H); return true;}
+static bool trans_vsadd_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSADD_W); return true;}
+static bool trans_vsadd_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSADD_D); return true;}
+static bool trans_vsadd_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VSADD_BU); return true;}
+static bool trans_vsadd_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VSADD_HU); return true;}
+static bool trans_vsadd_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VSADD_WU); return true;}
+static bool trans_vsadd_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VSADD_DU); return true;}
+static bool trans_vssub_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSSUB_B); return true;}
+static bool trans_vssub_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSSUB_H); return true;}
+static bool trans_vssub_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSSUB_W); return true;}
+static bool trans_vssub_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSSUB_D); return true;}
+static bool trans_vssub_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VSSUB_BU); return true;}
+static bool trans_vssub_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VSSUB_HU); return true;}
+static bool trans_vssub_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VSSUB_WU); return true;}
+static bool trans_vssub_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VSSUB_DU); return true;}
+static bool trans_vhaddw_h_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VHADDW_H_B); return true;}
+static bool trans_vhaddw_w_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VHADDW_W_H); return true;}
+static bool trans_vhaddw_d_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VHADDW_D_W); return true;}
+static bool trans_vhaddw_q_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VHADDW_Q_D); return true;}
+static bool trans_vhaddw_hu_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VHADDW_HU_BU); return true;}
+static bool trans_vhaddw_wu_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VHADDW_WU_HU); return true;}
+static bool trans_vhaddw_du_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VHADDW_DU_WU); return true;}
+static bool trans_vhaddw_qu_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VHADDW_QU_DU); return true;}
+static bool trans_vhsubw_h_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VHSUBW_H_B); return true;}
+static bool trans_vhsubw_w_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VHSUBW_W_H); return true;}
+static bool trans_vhsubw_d_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VHSUBW_D_W); return true;}
+static bool trans_vhsubw_q_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VHSUBW_Q_D); return true;}
+static bool trans_vhsubw_hu_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VHSUBW_HU_BU); return true;}
+static bool trans_vhsubw_wu_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VHSUBW_WU_HU); return true;}
+static bool trans_vhsubw_du_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VHSUBW_DU_WU); return true;}
+static bool trans_vhsubw_qu_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VHSUBW_QU_DU); return true;}
+static bool trans_vaddwev_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VADDWEV_H_B); return true;}
+static bool trans_vaddwev_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VADDWEV_W_H); return true;}
+static bool trans_vaddwev_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VADDWEV_D_W); return true;}
+static bool trans_vaddwev_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VADDWEV_Q_D); return true;}
+static bool trans_vaddwod_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VADDWOD_H_B); return true;}
+static bool trans_vaddwod_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VADDWOD_W_H); return true;}
+static bool trans_vaddwod_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VADDWOD_D_W); return true;}
+static bool trans_vaddwod_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VADDWOD_Q_D); return true;}
+static bool trans_vsubwev_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSUBWEV_H_B); return true;}
+static bool trans_vsubwev_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSUBWEV_W_H); return true;}
+static bool trans_vsubwev_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSUBWEV_D_W); return true;}
+static bool trans_vsubwev_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSUBWEV_Q_D); return true;}
+static bool trans_vsubwod_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSUBWOD_H_B); return true;}
+static bool trans_vsubwod_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSUBWOD_W_H); return true;}
+static bool trans_vsubwod_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSUBWOD_D_W); return true;}
+static bool trans_vsubwod_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSUBWOD_Q_D); return true;}
+static bool trans_vaddwev_h_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VADDWEV_H_BU); return true;}
+static bool trans_vaddwev_w_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VADDWEV_W_HU); return true;}
+static bool trans_vaddwev_d_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VADDWEV_D_WU); return true;}
+static bool trans_vaddwev_q_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VADDWEV_Q_DU); return true;}
+static bool trans_vaddwod_h_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VADDWOD_H_BU); return true;}
+static bool trans_vaddwod_w_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VADDWOD_W_HU); return true;}
+static bool trans_vaddwod_d_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VADDWOD_D_WU); return true;}
+static bool trans_vaddwod_q_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VADDWOD_Q_DU); return true;}
+static bool trans_vsubwev_h_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VSUBWEV_H_BU); return true;}
+static bool trans_vsubwev_w_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VSUBWEV_W_HU); return true;}
+static bool trans_vsubwev_d_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VSUBWEV_D_WU); return true;}
+static bool trans_vsubwev_q_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VSUBWEV_Q_DU); return true;}
+static bool trans_vsubwod_h_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VSUBWOD_H_BU); return true;}
+static bool trans_vsubwod_w_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VSUBWOD_W_HU); return true;}
+static bool trans_vsubwod_d_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VSUBWOD_D_WU); return true;}
+static bool trans_vsubwod_q_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VSUBWOD_Q_DU); return true;}
+static bool trans_vaddwev_h_bu_b(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VADDWEV_H_BU_B); return true;}
+static bool trans_vaddwev_w_hu_h(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VADDWEV_W_HU_H); return true;}
+static bool trans_vaddwev_d_wu_w(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VADDWEV_D_WU_W); return true;}
+static bool trans_vaddwev_q_du_d(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VADDWEV_Q_DU_D); return true;}
+static bool trans_vaddwod_h_bu_b(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VADDWOD_H_BU_B); return true;}
+static bool trans_vaddwod_w_hu_h(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VADDWOD_W_HU_H); return true;}
+static bool trans_vaddwod_d_wu_w(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VADDWOD_D_WU_W); return true;}
+static bool trans_vaddwod_q_du_d(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VADDWOD_Q_DU_D); return true;}
+static bool trans_vavg_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VAVG_B); return true;}
+static bool trans_vavg_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VAVG_H); return true;}
+static bool trans_vavg_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VAVG_W); return true;}
+static bool trans_vavg_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VAVG_D); return true;}
+static bool trans_vavg_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VAVG_BU); return true;}
+static bool trans_vavg_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VAVG_HU); return true;}
+static bool trans_vavg_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VAVG_WU); return true;}
+static bool trans_vavg_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VAVG_DU); return true;}
+static bool trans_vavgr_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VAVGR_B); return true;}
+static bool trans_vavgr_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VAVGR_H); return true;}
+static bool trans_vavgr_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VAVGR_W); return true;}
+static bool trans_vavgr_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VAVGR_D); return true;}
+static bool trans_vavgr_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VAVGR_BU); return true;}
+static bool trans_vavgr_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VAVGR_HU); return true;}
+static bool trans_vavgr_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VAVGR_WU); return true;}
+static bool trans_vavgr_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VAVGR_DU); return true;}
+static bool trans_vabsd_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VABSD_B); return true;}
+static bool trans_vabsd_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VABSD_H); return true;}
+static bool trans_vabsd_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VABSD_W); return true;}
+static bool trans_vabsd_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VABSD_D); return true;}
+static bool trans_vabsd_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VABSD_BU); return true;}
+static bool trans_vabsd_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VABSD_HU); return true;}
+static bool trans_vabsd_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VABSD_WU); return true;}
+static bool trans_vabsd_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VABSD_DU); return true;}
+static bool trans_vadda_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VADDA_B); return true;}
+static bool trans_vadda_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VADDA_H); return true;}
+static bool trans_vadda_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VADDA_W); return true;}
+static bool trans_vadda_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VADDA_D); return true;}
+static bool trans_vmax_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMAX_B); return true;}
+static bool trans_vmax_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMAX_H); return true;}
+static bool trans_vmax_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMAX_W); return true;}
+static bool trans_vmax_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMAX_D); return true;}
+static bool trans_vmaxi_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VMAXI_B); return true;}
+static bool trans_vmaxi_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VMAXI_H); return true;}
+static bool trans_vmaxi_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VMAXI_W); return true;}
+static bool trans_vmaxi_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VMAXI_D); return true;}
+static bool trans_vmax_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMAX_BU); return true;}
+static bool trans_vmax_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMAX_HU); return true;}
+static bool trans_vmax_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMAX_WU); return true;}
+static bool trans_vmax_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMAX_DU); return true;}
+static bool trans_vmaxi_bu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VMAXI_BU); return true;}
+static bool trans_vmaxi_hu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VMAXI_HU); return true;}
+static bool trans_vmaxi_wu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VMAXI_WU); return true;}
+static bool trans_vmaxi_du(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VMAXI_DU); return true;}
+static bool trans_vmin_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMIN_B); return true;}
+static bool trans_vmin_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMIN_H); return true;}
+static bool trans_vmin_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMIN_W); return true;}
+static bool trans_vmin_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMIN_D); return true;}
+static bool trans_vmini_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VMINI_B); return true;}
+static bool trans_vmini_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VMINI_H); return true;}
+static bool trans_vmini_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VMINI_W); return true;}
+static bool trans_vmini_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VMINI_D); return true;}
+static bool trans_vmin_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMIN_BU); return true;}
+static bool trans_vmin_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMIN_HU); return true;}
+static bool trans_vmin_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMIN_WU); return true;}
+static bool trans_vmin_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMIN_DU); return true;}
+static bool trans_vmini_bu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VMINI_BU); return true;}
+static bool trans_vmini_hu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VMINI_HU); return true;}
+static bool trans_vmini_wu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VMINI_WU); return true;}
+static bool trans_vmini_du(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VMINI_DU); return true;}
+static bool trans_vmul_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMUL_B); return true;}
+static bool trans_vmul_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMUL_H); return true;}
+static bool trans_vmul_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMUL_W); return true;}
+static bool trans_vmul_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMUL_D); return true;}
+static bool trans_vmuh_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMUH_B); return true;}
+static bool trans_vmuh_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMUH_H); return true;}
+static bool trans_vmuh_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMUH_W); return true;}
+static bool trans_vmuh_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMUH_D); return true;}
+static bool trans_vmuh_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMUH_BU); return true;}
+static bool trans_vmuh_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMUH_HU); return true;}
+static bool trans_vmuh_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMUH_WU); return true;}
+static bool trans_vmuh_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMUH_DU); return true;}
+static bool trans_vmulwev_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VMULWEV_H_B); return true;}
+static bool trans_vmulwev_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VMULWEV_W_H); return true;}
+static bool trans_vmulwev_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VMULWEV_D_W); return true;}
+static bool trans_vmulwev_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VMULWEV_Q_D); return true;}
+static bool trans_vmulwod_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VMULWOD_H_B); return true;}
+static bool trans_vmulwod_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VMULWOD_W_H); return true;}
+static bool trans_vmulwod_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VMULWOD_D_W); return true;}
+static bool trans_vmulwod_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VMULWOD_Q_D); return true;}
+static bool trans_vmulwev_h_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMULWEV_H_BU); return true;}
+static bool trans_vmulwev_w_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMULWEV_W_HU); return true;}
+static bool trans_vmulwev_d_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMULWEV_D_WU); return true;}
+static bool trans_vmulwev_q_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMULWEV_Q_DU); return true;}
+static bool trans_vmulwod_h_bu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMULWOD_H_BU); return true;}
+static bool trans_vmulwod_w_hu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMULWOD_W_HU); return true;}
+static bool trans_vmulwod_d_wu(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMULWOD_D_WU); return true;}
+static bool trans_vmulwod_q_du(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMULWOD_Q_DU); return true;}
+static bool trans_vmulwev_h_bu_b(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VMULWEV_H_BU_B); return true;}
+static bool trans_vmulwev_w_hu_h(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VMULWEV_W_HU_H); return true;}
+static bool trans_vmulwev_d_wu_w(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VMULWEV_D_WU_W); return true;}
+static bool trans_vmulwev_q_du_d(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VMULWEV_Q_DU_D); return true;}
+static bool trans_vmulwod_h_bu_b(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VMULWOD_H_BU_B); return true;}
+static bool trans_vmulwod_w_hu_h(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VMULWOD_W_HU_H); return true;}
+static bool trans_vmulwod_d_wu_w(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VMULWOD_D_WU_W); return true;}
+static bool trans_vmulwod_q_du_d(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_VMULWOD_Q_DU_D); return true;}
+static bool trans_vmadd_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMADD_B); return true;}
+static bool trans_vmadd_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMADD_H); return true;}
+static bool trans_vmadd_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMADD_W); return true;}
+static bool trans_vmadd_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMADD_D); return true;}
+static bool trans_vmsub_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMSUB_B); return true;}
+static bool trans_vmsub_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMSUB_H); return true;}
+static bool trans_vmsub_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMSUB_W); return true;}
+static bool trans_vmsub_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMSUB_D); return true;}
+static bool trans_vmaddwev_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMADDWEV_H_B); return true;}
+static bool trans_vmaddwev_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMADDWEV_W_H); return true;}
+static bool trans_vmaddwev_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMADDWEV_D_W); return true;}
+static bool trans_vmaddwev_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMADDWEV_Q_D); return true;}
+static bool trans_vmaddwod_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMADDWOD_H_B); return true;}
+static bool trans_vmaddwod_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMADDWOD_W_H); return true;}
+static bool trans_vmaddwod_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMADDWOD_D_W); return true;}
+static bool trans_vmaddwod_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VMADDWOD_Q_D); return true;}
+static bool trans_vmaddwev_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_VMADDWEV_H_BU); return true;}
+static bool trans_vmaddwev_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_VMADDWEV_W_HU); return true;}
+static bool trans_vmaddwev_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_VMADDWEV_D_WU); return true;}
+static bool trans_vmaddwev_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_VMADDWEV_Q_DU); return true;}
+static bool trans_vmaddwod_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_VMADDWOD_H_BU); return true;}
+static bool trans_vmaddwod_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_VMADDWOD_W_HU); return true;}
+static bool trans_vmaddwod_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_VMADDWOD_D_WU); return true;}
+static bool trans_vmaddwod_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_VMADDWOD_Q_DU); return true;}
+static bool trans_vmaddwev_h_bu_b(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_VMADDWEV_H_BU_B); return true;}
+static bool trans_vmaddwev_w_hu_h(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_VMADDWEV_W_HU_H); return true;}
+static bool trans_vmaddwev_d_wu_w(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_VMADDWEV_D_WU_W); return true;}
+static bool trans_vmaddwev_q_du_d(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_VMADDWEV_Q_DU_D); return true;}
+static bool trans_vmaddwod_h_bu_b(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_VMADDWOD_H_BU_B); return true;}
+static bool trans_vmaddwod_w_hu_h(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_VMADDWOD_W_HU_H); return true;}
+static bool trans_vmaddwod_d_wu_w(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_VMADDWOD_D_WU_W); return true;}
+static bool trans_vmaddwod_q_du_d(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_VMADDWOD_Q_DU_D); return true;}
+static bool trans_vdiv_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VDIV_B); return true;}
+static bool trans_vdiv_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VDIV_H); return true;}
+static bool trans_vdiv_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VDIV_W); return true;}
+static bool trans_vdiv_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VDIV_D); return true;}
+static bool trans_vdiv_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VDIV_BU); return true;}
+static bool trans_vdiv_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VDIV_HU); return true;}
+static bool trans_vdiv_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VDIV_WU); return true;}
+static bool trans_vdiv_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VDIV_DU); return true;}
+static bool trans_vmod_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMOD_B); return true;}
+static bool trans_vmod_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMOD_H); return true;}
+static bool trans_vmod_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMOD_W); return true;}
+static bool trans_vmod_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VMOD_D); return true;}
+static bool trans_vmod_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMOD_BU); return true;}
+static bool trans_vmod_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMOD_HU); return true;}
+static bool trans_vmod_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMOD_WU); return true;}
+static bool trans_vmod_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VMOD_DU); return true;}
+static bool trans_vsat_b(DisasContext *ctx, arg_vv_i *a)             {handle_arg_vv_i(ctx, a, LA_INST_VSAT_B); return true;}
+static bool trans_vsat_h(DisasContext *ctx, arg_vv_i *a)             {handle_arg_vv_i(ctx, a, LA_INST_VSAT_H); return true;}
+static bool trans_vsat_w(DisasContext *ctx, arg_vv_i *a)             {handle_arg_vv_i(ctx, a, LA_INST_VSAT_W); return true;}
+static bool trans_vsat_d(DisasContext *ctx, arg_vv_i *a)             {handle_arg_vv_i(ctx, a, LA_INST_VSAT_D); return true;}
+static bool trans_vsat_bu(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSAT_BU); return true;}
+static bool trans_vsat_hu(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSAT_HU); return true;}
+static bool trans_vsat_wu(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSAT_WU); return true;}
+static bool trans_vsat_du(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSAT_DU); return true;}
+static bool trans_vexth_h_b(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VEXTH_H_B); return true;}
+static bool trans_vexth_w_h(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VEXTH_W_H); return true;}
+static bool trans_vexth_d_w(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VEXTH_D_W); return true;}
+static bool trans_vexth_q_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VEXTH_Q_D); return true;}
+static bool trans_vexth_hu_bu(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VEXTH_HU_BU); return true;}
+static bool trans_vexth_wu_hu(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VEXTH_WU_HU); return true;}
+static bool trans_vexth_du_wu(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VEXTH_DU_WU); return true;}
+static bool trans_vexth_qu_du(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VEXTH_QU_DU); return true;}
+static bool trans_vsigncov_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSIGNCOV_B); return true;}
+static bool trans_vsigncov_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSIGNCOV_H); return true;}
+static bool trans_vsigncov_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSIGNCOV_W); return true;}
+static bool trans_vsigncov_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSIGNCOV_D); return true;}
+static bool trans_vmskltz_b(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VMSKLTZ_B); return true;}
+static bool trans_vmskltz_h(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VMSKLTZ_H); return true;}
+static bool trans_vmskltz_w(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VMSKLTZ_W); return true;}
+static bool trans_vmskltz_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VMSKLTZ_D); return true;}
+static bool trans_vmskgez_b(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VMSKGEZ_B); return true;}
+static bool trans_vmsknz_b(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(ctx, a, LA_INST_VMSKNZ_B); return true;}
+static bool trans_vldi(DisasContext *ctx, arg_v_i *a)                {handle_arg_v_i(ctx, a, LA_INST_VLDI); return true;}
+static bool trans_vand_v(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VAND_V); return true;}
+static bool trans_vor_v(DisasContext *ctx, arg_vvv *a)               {handle_arg_vvv(ctx, a, LA_INST_VOR_V); return true;}
+static bool trans_vxor_v(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VXOR_V); return true;}
+static bool trans_vnor_v(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VNOR_V); return true;}
+static bool trans_vandn_v(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VANDN_V); return true;}
+static bool trans_vorn_v(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VORN_V); return true;}
+static bool trans_vandi_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VANDI_B); return true;}
+static bool trans_vori_b(DisasContext *ctx, arg_vv_i *a)             {handle_arg_vv_i(ctx, a, LA_INST_VORI_B); return true;}
+static bool trans_vxori_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VXORI_B); return true;}
+static bool trans_vnori_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VNORI_B); return true;}
+static bool trans_vsll_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSLL_B); return true;}
+static bool trans_vsll_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSLL_H); return true;}
+static bool trans_vsll_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSLL_W); return true;}
+static bool trans_vsll_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSLL_D); return true;}
+static bool trans_vslli_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSLLI_B); return true;}
+static bool trans_vslli_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSLLI_H); return true;}
+static bool trans_vslli_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSLLI_W); return true;}
+static bool trans_vslli_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSLLI_D); return true;}
+static bool trans_vsrl_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSRL_B); return true;}
+static bool trans_vsrl_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSRL_H); return true;}
+static bool trans_vsrl_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSRL_W); return true;}
+static bool trans_vsrl_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSRL_D); return true;}
+static bool trans_vsrli_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSRLI_B); return true;}
+static bool trans_vsrli_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSRLI_H); return true;}
+static bool trans_vsrli_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSRLI_W); return true;}
+static bool trans_vsrli_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSRLI_D); return true;}
+static bool trans_vsra_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSRA_B); return true;}
+static bool trans_vsra_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSRA_H); return true;}
+static bool trans_vsra_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSRA_W); return true;}
+static bool trans_vsra_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSRA_D); return true;}
+static bool trans_vsrai_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSRAI_B); return true;}
+static bool trans_vsrai_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSRAI_H); return true;}
+static bool trans_vsrai_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSRAI_W); return true;}
+static bool trans_vsrai_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSRAI_D); return true;}
+static bool trans_vrotr_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VROTR_B); return true;}
+static bool trans_vrotr_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VROTR_H); return true;}
+static bool trans_vrotr_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VROTR_W); return true;}
+static bool trans_vrotr_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VROTR_D); return true;}
+static bool trans_vrotri_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VROTRI_B); return true;}
+static bool trans_vrotri_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VROTRI_H); return true;}
+static bool trans_vrotri_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VROTRI_W); return true;}
+static bool trans_vrotri_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VROTRI_D); return true;}
+static bool trans_vsllwil_h_b(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSLLWIL_H_B); return true;}
+static bool trans_vsllwil_w_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSLLWIL_W_H); return true;}
+static bool trans_vsllwil_d_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSLLWIL_D_W); return true;}
+static bool trans_vextl_q_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VEXTL_Q_D); return true;}
+static bool trans_vsllwil_hu_bu(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_VSLLWIL_HU_BU); return true;}
+static bool trans_vsllwil_wu_hu(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_VSLLWIL_WU_HU); return true;}
+static bool trans_vsllwil_du_wu(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_VSLLWIL_DU_WU); return true;}
+static bool trans_vextl_qu_du(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VEXTL_QU_DU); return true;}
+static bool trans_vsrlr_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSRLR_B); return true;}
+static bool trans_vsrlr_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSRLR_H); return true;}
+static bool trans_vsrlr_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSRLR_W); return true;}
+static bool trans_vsrlr_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSRLR_D); return true;}
+static bool trans_vsrlri_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSRLRI_B); return true;}
+static bool trans_vsrlri_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSRLRI_H); return true;}
+static bool trans_vsrlri_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSRLRI_W); return true;}
+static bool trans_vsrlri_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSRLRI_D); return true;}
+static bool trans_vsrar_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSRAR_B); return true;}
+static bool trans_vsrar_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSRAR_H); return true;}
+static bool trans_vsrar_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSRAR_W); return true;}
+static bool trans_vsrar_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSRAR_D); return true;}
+static bool trans_vsrari_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSRARI_B); return true;}
+static bool trans_vsrari_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSRARI_H); return true;}
+static bool trans_vsrari_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSRARI_W); return true;}
+static bool trans_vsrari_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSRARI_D); return true;}
+static bool trans_vsrln_b_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VSRLN_B_H); return true;}
+static bool trans_vsrln_h_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VSRLN_H_W); return true;}
+static bool trans_vsrln_w_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VSRLN_W_D); return true;}
+static bool trans_vsran_b_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VSRAN_B_H); return true;}
+static bool trans_vsran_h_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VSRAN_H_W); return true;}
+static bool trans_vsran_w_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VSRAN_W_D); return true;}
+static bool trans_vsrlni_b_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VSRLNI_B_H); return true;}
+static bool trans_vsrlni_h_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VSRLNI_H_W); return true;}
+static bool trans_vsrlni_w_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VSRLNI_W_D); return true;}
+static bool trans_vsrlni_d_q(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VSRLNI_D_Q); return true;}
+static bool trans_vsrani_b_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VSRANI_B_H); return true;}
+static bool trans_vsrani_h_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VSRANI_H_W); return true;}
+static bool trans_vsrani_w_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VSRANI_W_D); return true;}
+static bool trans_vsrani_d_q(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VSRANI_D_Q); return true;}
+static bool trans_vsrlrn_b_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSRLRN_B_H); return true;}
+static bool trans_vsrlrn_h_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSRLRN_H_W); return true;}
+static bool trans_vsrlrn_w_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSRLRN_W_D); return true;}
+static bool trans_vsrarn_b_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSRARN_B_H); return true;}
+static bool trans_vsrarn_h_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSRARN_H_W); return true;}
+static bool trans_vsrarn_w_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSRARN_W_D); return true;}
+static bool trans_vsrlrni_b_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSRLRNI_B_H); return true;}
+static bool trans_vsrlrni_h_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSRLRNI_H_W); return true;}
+static bool trans_vsrlrni_w_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSRLRNI_W_D); return true;}
+static bool trans_vsrlrni_d_q(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSRLRNI_D_Q); return true;}
+static bool trans_vsrarni_b_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSRARNI_B_H); return true;}
+static bool trans_vsrarni_h_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSRARNI_H_W); return true;}
+static bool trans_vsrarni_w_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSRARNI_W_D); return true;}
+static bool trans_vsrarni_d_q(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSRARNI_D_Q); return true;}
+static bool trans_vssrln_b_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSSRLN_B_H); return true;}
+static bool trans_vssrln_h_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSSRLN_H_W); return true;}
+static bool trans_vssrln_w_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSSRLN_W_D); return true;}
+static bool trans_vssran_b_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSSRAN_B_H); return true;}
+static bool trans_vssran_h_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSSRAN_H_W); return true;}
+static bool trans_vssran_w_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VSSRAN_W_D); return true;}
+static bool trans_vssrln_bu_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSSRLN_BU_H); return true;}
+static bool trans_vssrln_hu_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSSRLN_HU_W); return true;}
+static bool trans_vssrln_wu_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSSRLN_WU_D); return true;}
+static bool trans_vssran_bu_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSSRAN_BU_H); return true;}
+static bool trans_vssran_hu_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSSRAN_HU_W); return true;}
+static bool trans_vssran_wu_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSSRAN_WU_D); return true;}
+static bool trans_vssrlni_b_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSSRLNI_B_H); return true;}
+static bool trans_vssrlni_h_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSSRLNI_H_W); return true;}
+static bool trans_vssrlni_w_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSSRLNI_W_D); return true;}
+static bool trans_vssrlni_d_q(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSSRLNI_D_Q); return true;}
+static bool trans_vssrani_b_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSSRANI_B_H); return true;}
+static bool trans_vssrani_h_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSSRANI_H_W); return true;}
+static bool trans_vssrani_w_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSSRANI_W_D); return true;}
+static bool trans_vssrani_d_q(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_VSSRANI_D_Q); return true;}
+static bool trans_vssrlni_bu_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRLNI_BU_H); return true;}
+static bool trans_vssrlni_hu_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRLNI_HU_W); return true;}
+static bool trans_vssrlni_wu_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRLNI_WU_D); return true;}
+static bool trans_vssrlni_du_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRLNI_DU_Q); return true;}
+static bool trans_vssrani_bu_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRANI_BU_H); return true;}
+static bool trans_vssrani_hu_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRANI_HU_W); return true;}
+static bool trans_vssrani_wu_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRANI_WU_D); return true;}
+static bool trans_vssrani_du_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRANI_DU_Q); return true;}
+static bool trans_vssrlrn_b_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSSRLRN_B_H); return true;}
+static bool trans_vssrlrn_h_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSSRLRN_H_W); return true;}
+static bool trans_vssrlrn_w_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSSRLRN_W_D); return true;}
+static bool trans_vssrarn_b_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSSRARN_B_H); return true;}
+static bool trans_vssrarn_h_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSSRARN_H_W); return true;}
+static bool trans_vssrarn_w_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_VSSRARN_W_D); return true;}
+static bool trans_vssrlrn_bu_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VSSRLRN_BU_H); return true;}
+static bool trans_vssrlrn_hu_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VSSRLRN_HU_W); return true;}
+static bool trans_vssrlrn_wu_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VSSRLRN_WU_D); return true;}
+static bool trans_vssrarn_bu_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VSSRARN_BU_H); return true;}
+static bool trans_vssrarn_hu_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VSSRARN_HU_W); return true;}
+static bool trans_vssrarn_wu_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VSSRARN_WU_D); return true;}
+static bool trans_vssrlrni_b_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRLRNI_B_H); return true;}
+static bool trans_vssrlrni_h_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRLRNI_H_W); return true;}
+static bool trans_vssrlrni_w_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRLRNI_W_D); return true;}
+static bool trans_vssrlrni_d_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRLRNI_D_Q); return true;}
+static bool trans_vssrarni_b_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRARNI_B_H); return true;}
+static bool trans_vssrarni_h_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRARNI_H_W); return true;}
+static bool trans_vssrarni_w_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRARNI_W_D); return true;}
+static bool trans_vssrarni_d_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_VSSRARNI_D_Q); return true;}
+static bool trans_vssrlrni_bu_h(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_VSSRLRNI_BU_H); return true;}
+static bool trans_vssrlrni_hu_w(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_VSSRLRNI_HU_W); return true;}
+static bool trans_vssrlrni_wu_d(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_VSSRLRNI_WU_D); return true;}
+static bool trans_vssrlrni_du_q(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_VSSRLRNI_DU_Q); return true;}
+static bool trans_vssrarni_bu_h(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_VSSRARNI_BU_H); return true;}
+static bool trans_vssrarni_hu_w(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_VSSRARNI_HU_W); return true;}
+static bool trans_vssrarni_wu_d(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_VSSRARNI_WU_D); return true;}
+static bool trans_vssrarni_du_q(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_VSSRARNI_DU_Q); return true;}
+static bool trans_vclo_b(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(ctx, a, LA_INST_VCLO_B); return true;}
+static bool trans_vclo_h(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(ctx, a, LA_INST_VCLO_H); return true;}
+static bool trans_vclo_w(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(ctx, a, LA_INST_VCLO_W); return true;}
+static bool trans_vclo_d(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(ctx, a, LA_INST_VCLO_D); return true;}
+static bool trans_vclz_b(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(ctx, a, LA_INST_VCLZ_B); return true;}
+static bool trans_vclz_h(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(ctx, a, LA_INST_VCLZ_H); return true;}
+static bool trans_vclz_w(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(ctx, a, LA_INST_VCLZ_W); return true;}
+static bool trans_vclz_d(DisasContext *ctx, arg_vv *a)               {handle_arg_vv(ctx, a, LA_INST_VCLZ_D); return true;}
+static bool trans_vpcnt_b(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_VPCNT_B); return true;}
+static bool trans_vpcnt_h(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_VPCNT_H); return true;}
+static bool trans_vpcnt_w(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_VPCNT_W); return true;}
+static bool trans_vpcnt_d(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_VPCNT_D); return true;}
+static bool trans_vbitclr_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VBITCLR_B); return true;}
+static bool trans_vbitclr_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VBITCLR_H); return true;}
+static bool trans_vbitclr_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VBITCLR_W); return true;}
+static bool trans_vbitclr_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VBITCLR_D); return true;}
+static bool trans_vbitclri_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VBITCLRI_B); return true;}
+static bool trans_vbitclri_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VBITCLRI_H); return true;}
+static bool trans_vbitclri_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VBITCLRI_W); return true;}
+static bool trans_vbitclri_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VBITCLRI_D); return true;}
+static bool trans_vbitset_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VBITSET_B); return true;}
+static bool trans_vbitset_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VBITSET_H); return true;}
+static bool trans_vbitset_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VBITSET_W); return true;}
+static bool trans_vbitset_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VBITSET_D); return true;}
+static bool trans_vbitseti_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VBITSETI_B); return true;}
+static bool trans_vbitseti_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VBITSETI_H); return true;}
+static bool trans_vbitseti_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VBITSETI_W); return true;}
+static bool trans_vbitseti_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VBITSETI_D); return true;}
+static bool trans_vbitrev_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VBITREV_B); return true;}
+static bool trans_vbitrev_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VBITREV_H); return true;}
+static bool trans_vbitrev_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VBITREV_W); return true;}
+static bool trans_vbitrev_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VBITREV_D); return true;}
+static bool trans_vbitrevi_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VBITREVI_B); return true;}
+static bool trans_vbitrevi_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VBITREVI_H); return true;}
+static bool trans_vbitrevi_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VBITREVI_W); return true;}
+static bool trans_vbitrevi_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VBITREVI_D); return true;}
+static bool trans_vfrstp_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VFRSTP_B); return true;}
+static bool trans_vfrstp_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VFRSTP_H); return true;}
+static bool trans_vfrstpi_b(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_VFRSTPI_B); return true;}
+static bool trans_vfrstpi_h(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_VFRSTPI_H); return true;}
+static bool trans_vfadd_s(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VFADD_S); return true;}
+static bool trans_vfadd_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VFADD_D); return true;}
+static bool trans_vfsub_s(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VFSUB_S); return true;}
+static bool trans_vfsub_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VFSUB_D); return true;}
+static bool trans_vfmul_s(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VFMUL_S); return true;}
+static bool trans_vfmul_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VFMUL_D); return true;}
+static bool trans_vfdiv_s(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VFDIV_S); return true;}
+static bool trans_vfdiv_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VFDIV_D); return true;}
+static bool trans_vfmadd_s(DisasContext *ctx, arg_vvvv *a)           {handle_arg_vvvv(ctx, a, LA_INST_VFMADD_S); return true;}
+static bool trans_vfmadd_d(DisasContext *ctx, arg_vvvv *a)           {handle_arg_vvvv(ctx, a, LA_INST_VFMADD_D); return true;}
+static bool trans_vfmsub_s(DisasContext *ctx, arg_vvvv *a)           {handle_arg_vvvv(ctx, a, LA_INST_VFMSUB_S); return true;}
+static bool trans_vfmsub_d(DisasContext *ctx, arg_vvvv *a)           {handle_arg_vvvv(ctx, a, LA_INST_VFMSUB_D); return true;}
+static bool trans_vfnmadd_s(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(ctx, a, LA_INST_VFNMADD_S); return true;}
+static bool trans_vfnmadd_d(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(ctx, a, LA_INST_VFNMADD_D); return true;}
+static bool trans_vfnmsub_s(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(ctx, a, LA_INST_VFNMSUB_S); return true;}
+static bool trans_vfnmsub_d(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(ctx, a, LA_INST_VFNMSUB_D); return true;}
+static bool trans_vfmax_s(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VFMAX_S); return true;}
+static bool trans_vfmax_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VFMAX_D); return true;}
+static bool trans_vfmin_s(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VFMIN_S); return true;}
+static bool trans_vfmin_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VFMIN_D); return true;}
+static bool trans_vfmaxa_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VFMAXA_S); return true;}
+static bool trans_vfmaxa_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VFMAXA_D); return true;}
+static bool trans_vfmina_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VFMINA_S); return true;}
+static bool trans_vfmina_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_VFMINA_D); return true;}
+static bool trans_vflogb_s(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(ctx, a, LA_INST_VFLOGB_S); return true;}
+static bool trans_vflogb_d(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(ctx, a, LA_INST_VFLOGB_D); return true;}
+static bool trans_vfclass_s(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VFCLASS_S); return true;}
+static bool trans_vfclass_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VFCLASS_D); return true;}
+static bool trans_vfsqrt_s(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(ctx, a, LA_INST_VFSQRT_S); return true;}
+static bool trans_vfsqrt_d(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(ctx, a, LA_INST_VFSQRT_D); return true;}
+static bool trans_vfrecip_s(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VFRECIP_S); return true;}
+static bool trans_vfrecip_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VFRECIP_D); return true;}
+static bool trans_vfrsqrt_s(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VFRSQRT_S); return true;}
+static bool trans_vfrsqrt_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_VFRSQRT_D); return true;}
+static bool trans_vfcvtl_s_h(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_VFCVTL_S_H); return true;}
+static bool trans_vfcvth_s_h(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_VFCVTH_S_H); return true;}
+static bool trans_vfcvtl_d_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_VFCVTL_D_S); return true;}
+static bool trans_vfcvth_d_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_VFCVTH_D_S); return true;}
+static bool trans_vfcvt_h_s(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VFCVT_H_S); return true;}
+static bool trans_vfcvt_s_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VFCVT_S_D); return true;}
+static bool trans_vfrint_s(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(ctx, a, LA_INST_VFRINT_S); return true;}
+static bool trans_vfrint_d(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(ctx, a, LA_INST_VFRINT_D); return true;}
+static bool trans_vfrintrm_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_VFRINTRM_S); return true;}
+static bool trans_vfrintrm_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_VFRINTRM_D); return true;}
+static bool trans_vfrintrp_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_VFRINTRP_S); return true;}
+static bool trans_vfrintrp_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_VFRINTRP_D); return true;}
+static bool trans_vfrintrz_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_VFRINTRZ_S); return true;}
+static bool trans_vfrintrz_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_VFRINTRZ_D); return true;}
+static bool trans_vfrintrne_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VFRINTRNE_S); return true;}
+static bool trans_vfrintrne_d(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VFRINTRNE_D); return true;}
+static bool trans_vftint_w_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_VFTINT_W_S); return true;}
+static bool trans_vftint_l_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_VFTINT_L_D); return true;}
+static bool trans_vftintrm_w_s(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_VFTINTRM_W_S); return true;}
+static bool trans_vftintrm_l_d(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_VFTINTRM_L_D); return true;}
+static bool trans_vftintrp_w_s(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_VFTINTRP_W_S); return true;}
+static bool trans_vftintrp_l_d(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_VFTINTRP_L_D); return true;}
+static bool trans_vftintrz_w_s(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_VFTINTRZ_W_S); return true;}
+static bool trans_vftintrz_l_d(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_VFTINTRZ_L_D); return true;}
+static bool trans_vftintrne_w_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VFTINTRNE_W_S); return true;}
+static bool trans_vftintrne_l_d(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VFTINTRNE_L_D); return true;}
+static bool trans_vftint_wu_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VFTINT_WU_S); return true;}
+static bool trans_vftint_lu_d(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VFTINT_LU_D); return true;}
+static bool trans_vftintrz_wu_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VFTINTRZ_WU_S); return true;}
+static bool trans_vftintrz_lu_d(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VFTINTRZ_LU_D); return true;}
+static bool trans_vftint_w_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VFTINT_W_D); return true;}
+static bool trans_vftintrm_w_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VFTINTRM_W_D); return true;}
+static bool trans_vftintrp_w_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VFTINTRP_W_D); return true;}
+static bool trans_vftintrz_w_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_VFTINTRZ_W_D); return true;}
+static bool trans_vftintrne_w_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_VFTINTRNE_W_D); return true;}
+static bool trans_vftintl_l_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VFTINTL_L_S); return true;}
+static bool trans_vftinth_l_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VFTINTH_L_S); return true;}
+static bool trans_vftintrml_l_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VFTINTRML_L_S); return true;}
+static bool trans_vftintrmh_l_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VFTINTRMH_L_S); return true;}
+static bool trans_vftintrpl_l_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VFTINTRPL_L_S); return true;}
+static bool trans_vftintrph_l_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VFTINTRPH_L_S); return true;}
+static bool trans_vftintrzl_l_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VFTINTRZL_L_S); return true;}
+static bool trans_vftintrzh_l_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VFTINTRZH_L_S); return true;}
+static bool trans_vftintrnel_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(ctx, a, LA_INST_VFTINTRNEL_L_S); return true;}
+static bool trans_vftintrneh_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(ctx, a, LA_INST_VFTINTRNEH_L_S); return true;}
+static bool trans_vffint_s_w(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_VFFINT_S_W); return true;}
+static bool trans_vffint_s_wu(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VFFINT_S_WU); return true;}
+static bool trans_vffint_d_l(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_VFFINT_D_L); return true;}
+static bool trans_vffint_d_lu(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VFFINT_D_LU); return true;}
+static bool trans_vffintl_d_w(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VFFINTL_D_W); return true;}
+static bool trans_vffinth_d_w(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VFFINTH_D_W); return true;}
+static bool trans_vffint_s_l(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_VFFINT_S_L); return true;}
+static bool trans_vseq_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSEQ_B); return true;}
+static bool trans_vseq_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSEQ_H); return true;}
+static bool trans_vseq_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSEQ_W); return true;}
+static bool trans_vseq_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSEQ_D); return true;}
+static bool trans_vseqi_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSEQI_B); return true;}
+static bool trans_vseqi_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSEQI_H); return true;}
+static bool trans_vseqi_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSEQI_W); return true;}
+static bool trans_vseqi_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSEQI_D); return true;}
+static bool trans_vsle_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSLE_B); return true;}
+static bool trans_vsle_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSLE_H); return true;}
+static bool trans_vsle_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSLE_W); return true;}
+static bool trans_vsle_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSLE_D); return true;}
+static bool trans_vslei_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSLEI_B); return true;}
+static bool trans_vslei_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSLEI_H); return true;}
+static bool trans_vslei_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSLEI_W); return true;}
+static bool trans_vslei_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSLEI_D); return true;}
+static bool trans_vsle_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSLE_BU); return true;}
+static bool trans_vsle_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSLE_HU); return true;}
+static bool trans_vsle_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSLE_WU); return true;}
+static bool trans_vsle_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSLE_DU); return true;}
+static bool trans_vslei_bu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSLEI_BU); return true;}
+static bool trans_vslei_hu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSLEI_HU); return true;}
+static bool trans_vslei_wu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSLEI_WU); return true;}
+static bool trans_vslei_du(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSLEI_DU); return true;}
+static bool trans_vslt_b(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSLT_B); return true;}
+static bool trans_vslt_h(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSLT_H); return true;}
+static bool trans_vslt_w(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSLT_W); return true;}
+static bool trans_vslt_d(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_VSLT_D); return true;}
+static bool trans_vslti_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSLTI_B); return true;}
+static bool trans_vslti_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSLTI_H); return true;}
+static bool trans_vslti_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSLTI_W); return true;}
+static bool trans_vslti_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VSLTI_D); return true;}
+static bool trans_vslt_bu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSLT_BU); return true;}
+static bool trans_vslt_hu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSLT_HU); return true;}
+static bool trans_vslt_wu(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSLT_WU); return true;}
+static bool trans_vslt_du(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSLT_DU); return true;}
+static bool trans_vslti_bu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSLTI_BU); return true;}
+static bool trans_vslti_hu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSLTI_HU); return true;}
+static bool trans_vslti_wu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSLTI_WU); return true;}
+static bool trans_vslti_du(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VSLTI_DU); return true;}
+static bool trans_vfcmp_cond_s(DisasContext *ctx, arg_vvv_fcond *a)  {handle_arg_vvv_fcond(ctx, a, LA_INST_VFCMP_COND_S); return true;}
+static bool trans_vfcmp_cond_d(DisasContext *ctx, arg_vvv_fcond *a)  {handle_arg_vvv_fcond(ctx, a, LA_INST_VFCMP_COND_D); return true;}
+static bool trans_vbitsel_v(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(ctx, a, LA_INST_VBITSEL_V); return true;}
+static bool trans_vbitseli_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VBITSELI_B); return true;}
+static bool trans_vseteqz_v(DisasContext *ctx, arg_cv *a)            {handle_arg_cv(ctx, a, LA_INST_VSETEQZ_V); return true;}
+static bool trans_vsetnez_v(DisasContext *ctx, arg_cv *a)            {handle_arg_cv(ctx, a, LA_INST_VSETNEZ_V); return true;}
+static bool trans_vsetanyeqz_b(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(ctx, a, LA_INST_VSETANYEQZ_B); return true;}
+static bool trans_vsetanyeqz_h(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(ctx, a, LA_INST_VSETANYEQZ_H); return true;}
+static bool trans_vsetanyeqz_w(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(ctx, a, LA_INST_VSETANYEQZ_W); return true;}
+static bool trans_vsetanyeqz_d(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(ctx, a, LA_INST_VSETANYEQZ_D); return true;}
+static bool trans_vsetallnez_b(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(ctx, a, LA_INST_VSETALLNEZ_B); return true;}
+static bool trans_vsetallnez_h(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(ctx, a, LA_INST_VSETALLNEZ_H); return true;}
+static bool trans_vsetallnez_w(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(ctx, a, LA_INST_VSETALLNEZ_W); return true;}
+static bool trans_vsetallnez_d(DisasContext *ctx, arg_cv *a)         {handle_arg_cv(ctx, a, LA_INST_VSETALLNEZ_D); return true;}
+static bool trans_vinsgr2vr_b(DisasContext *ctx, arg_vr_i *a)        {handle_arg_vr_i(ctx, a, LA_INST_VINSGR2VR_B); return true;}
+static bool trans_vinsgr2vr_h(DisasContext *ctx, arg_vr_i *a)        {handle_arg_vr_i(ctx, a, LA_INST_VINSGR2VR_H); return true;}
+static bool trans_vinsgr2vr_w(DisasContext *ctx, arg_vr_i *a)        {handle_arg_vr_i(ctx, a, LA_INST_VINSGR2VR_W); return true;}
+static bool trans_vinsgr2vr_d(DisasContext *ctx, arg_vr_i *a)        {handle_arg_vr_i(ctx, a, LA_INST_VINSGR2VR_D); return true;}
+static bool trans_vpickve2gr_b(DisasContext *ctx, arg_rv_i *a)       {handle_arg_rv_i(ctx, a, LA_INST_VPICKVE2GR_B); return true;}
+static bool trans_vpickve2gr_h(DisasContext *ctx, arg_rv_i *a)       {handle_arg_rv_i(ctx, a, LA_INST_VPICKVE2GR_H); return true;}
+static bool trans_vpickve2gr_w(DisasContext *ctx, arg_rv_i *a)       {handle_arg_rv_i(ctx, a, LA_INST_VPICKVE2GR_W); return true;}
+static bool trans_vpickve2gr_d(DisasContext *ctx, arg_rv_i *a)       {handle_arg_rv_i(ctx, a, LA_INST_VPICKVE2GR_D); return true;}
+static bool trans_vpickve2gr_bu(DisasContext *ctx, arg_rv_i *a)      {handle_arg_rv_i(ctx, a, LA_INST_VPICKVE2GR_BU); return true;}
+static bool trans_vpickve2gr_hu(DisasContext *ctx, arg_rv_i *a)      {handle_arg_rv_i(ctx, a, LA_INST_VPICKVE2GR_HU); return true;}
+static bool trans_vpickve2gr_wu(DisasContext *ctx, arg_rv_i *a)      {handle_arg_rv_i(ctx, a, LA_INST_VPICKVE2GR_WU); return true;}
+static bool trans_vpickve2gr_du(DisasContext *ctx, arg_rv_i *a)      {handle_arg_rv_i(ctx, a, LA_INST_VPICKVE2GR_DU); return true;}
+static bool trans_vreplgr2vr_b(DisasContext *ctx, arg_vr *a)         {handle_arg_vr(ctx, a, LA_INST_VREPLGR2VR_B); return true;}
+static bool trans_vreplgr2vr_h(DisasContext *ctx, arg_vr *a)         {handle_arg_vr(ctx, a, LA_INST_VREPLGR2VR_H); return true;}
+static bool trans_vreplgr2vr_w(DisasContext *ctx, arg_vr *a)         {handle_arg_vr(ctx, a, LA_INST_VREPLGR2VR_W); return true;}
+static bool trans_vreplgr2vr_d(DisasContext *ctx, arg_vr *a)         {handle_arg_vr(ctx, a, LA_INST_VREPLGR2VR_D); return true;}
+static bool trans_vreplve_b(DisasContext *ctx, arg_vvr *a)           {handle_arg_vvr(ctx, a, LA_INST_VREPLVE_B); return true;}
+static bool trans_vreplve_h(DisasContext *ctx, arg_vvr *a)           {handle_arg_vvr(ctx, a, LA_INST_VREPLVE_H); return true;}
+static bool trans_vreplve_w(DisasContext *ctx, arg_vvr *a)           {handle_arg_vvr(ctx, a, LA_INST_VREPLVE_W); return true;}
+static bool trans_vreplve_d(DisasContext *ctx, arg_vvr *a)           {handle_arg_vvr(ctx, a, LA_INST_VREPLVE_D); return true;}
+static bool trans_vreplvei_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VREPLVEI_B); return true;}
+static bool trans_vreplvei_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VREPLVEI_H); return true;}
+static bool trans_vreplvei_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VREPLVEI_W); return true;}
+static bool trans_vreplvei_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VREPLVEI_D); return true;}
+static bool trans_vbsll_v(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VBSLL_V); return true;}
+static bool trans_vbsrl_v(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_VBSRL_V); return true;}
+static bool trans_vpackev_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPACKEV_B); return true;}
+static bool trans_vpackev_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPACKEV_H); return true;}
+static bool trans_vpackev_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPACKEV_W); return true;}
+static bool trans_vpackev_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPACKEV_D); return true;}
+static bool trans_vpackod_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPACKOD_B); return true;}
+static bool trans_vpackod_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPACKOD_H); return true;}
+static bool trans_vpackod_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPACKOD_W); return true;}
+static bool trans_vpackod_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPACKOD_D); return true;}
+static bool trans_vpickev_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPICKEV_B); return true;}
+static bool trans_vpickev_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPICKEV_H); return true;}
+static bool trans_vpickev_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPICKEV_W); return true;}
+static bool trans_vpickev_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPICKEV_D); return true;}
+static bool trans_vpickod_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPICKOD_B); return true;}
+static bool trans_vpickod_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPICKOD_H); return true;}
+static bool trans_vpickod_w(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPICKOD_W); return true;}
+static bool trans_vpickod_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_VPICKOD_D); return true;}
+static bool trans_vilvl_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VILVL_B); return true;}
+static bool trans_vilvl_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VILVL_H); return true;}
+static bool trans_vilvl_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VILVL_W); return true;}
+static bool trans_vilvl_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VILVL_D); return true;}
+static bool trans_vilvh_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VILVH_B); return true;}
+static bool trans_vilvh_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VILVH_H); return true;}
+static bool trans_vilvh_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VILVH_W); return true;}
+static bool trans_vilvh_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VILVH_D); return true;}
+static bool trans_vshuf_b(DisasContext *ctx, arg_vvvv *a)            {handle_arg_vvvv(ctx, a, LA_INST_VSHUF_B); return true;}
+static bool trans_vshuf_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSHUF_H); return true;}
+static bool trans_vshuf_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSHUF_W); return true;}
+static bool trans_vshuf_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_VSHUF_D); return true;}
+static bool trans_vshuf4i_b(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_VSHUF4I_B); return true;}
+static bool trans_vshuf4i_h(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_VSHUF4I_H); return true;}
+static bool trans_vshuf4i_w(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_VSHUF4I_W); return true;}
+static bool trans_vshuf4i_d(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_VSHUF4I_D); return true;}
+static bool trans_vpermi_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_VPERMI_W); return true;}
+static bool trans_vextrins_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VEXTRINS_D); return true;}
+static bool trans_vextrins_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VEXTRINS_W); return true;}
+static bool trans_vextrins_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VEXTRINS_H); return true;}
+static bool trans_vextrins_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_VEXTRINS_B); return true;}
+static bool trans_vld(DisasContext *ctx, arg_vr_i *a)                {handle_arg_vr_i(ctx, a, LA_INST_VLD); return true;}
+static bool trans_vst(DisasContext *ctx, arg_vr_i *a)                {handle_arg_vr_i(ctx, a, LA_INST_VST); return true;}
+static bool trans_vldx(DisasContext *ctx, arg_vrr *a)                {handle_arg_vrr(ctx, a, LA_INST_VLDX); return true;}
+static bool trans_vstx(DisasContext *ctx, arg_vrr *a)                {handle_arg_vrr(ctx, a, LA_INST_VSTX); return true;}
+static bool trans_vldrepl_d(DisasContext *ctx, arg_vr_i *a)          {handle_arg_vr_i(ctx, a, LA_INST_VLDREPL_D); return true;}
+static bool trans_vldrepl_w(DisasContext *ctx, arg_vr_i *a)          {handle_arg_vr_i(ctx, a, LA_INST_VLDREPL_W); return true;}
+static bool trans_vldrepl_h(DisasContext *ctx, arg_vr_i *a)          {handle_arg_vr_i(ctx, a, LA_INST_VLDREPL_H); return true;}
+static bool trans_vldrepl_b(DisasContext *ctx, arg_vr_i *a)          {handle_arg_vr_i(ctx, a, LA_INST_VLDREPL_B); return true;}
+static bool trans_vstelm_d(DisasContext *ctx, arg_vr_ii *a)          {handle_arg_vr_ii(ctx, a, LA_INST_VSTELM_D); return true;}
+static bool trans_vstelm_w(DisasContext *ctx, arg_vr_ii *a)          {handle_arg_vr_ii(ctx, a, LA_INST_VSTELM_W); return true;}
+static bool trans_vstelm_h(DisasContext *ctx, arg_vr_ii *a)          {handle_arg_vr_ii(ctx, a, LA_INST_VSTELM_H); return true;}
+static bool trans_vstelm_b(DisasContext *ctx, arg_vr_ii *a)          {handle_arg_vr_ii(ctx, a, LA_INST_VSTELM_B); return true;}
+static bool trans_xvadd_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVADD_B); return true;}
+static bool trans_xvadd_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVADD_H); return true;}
+static bool trans_xvadd_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVADD_W); return true;}
+static bool trans_xvadd_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVADD_D); return true;}
+static bool trans_xvadd_q(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVADD_Q); return true;}
+static bool trans_xvsub_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSUB_B); return true;}
+static bool trans_xvsub_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSUB_H); return true;}
+static bool trans_xvsub_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSUB_W); return true;}
+static bool trans_xvsub_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSUB_D); return true;}
+static bool trans_xvsub_q(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSUB_Q); return true;}
+static bool trans_xvaddi_bu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVADDI_BU); return true;}
+static bool trans_xvaddi_hu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVADDI_HU); return true;}
+static bool trans_xvaddi_wu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVADDI_WU); return true;}
+static bool trans_xvaddi_du(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVADDI_DU); return true;}
+static bool trans_xvsubi_bu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSUBI_BU); return true;}
+static bool trans_xvsubi_hu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSUBI_HU); return true;}
+static bool trans_xvsubi_wu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSUBI_WU); return true;}
+static bool trans_xvsubi_du(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSUBI_DU); return true;}
+static bool trans_xvneg_b(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_XVNEG_B); return true;}
+static bool trans_xvneg_h(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_XVNEG_H); return true;}
+static bool trans_xvneg_w(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_XVNEG_W); return true;}
+static bool trans_xvneg_d(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_XVNEG_D); return true;}
+static bool trans_xvsadd_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSADD_B); return true;}
+static bool trans_xvsadd_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSADD_H); return true;}
+static bool trans_xvsadd_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSADD_W); return true;}
+static bool trans_xvsadd_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSADD_D); return true;}
+static bool trans_xvsadd_bu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVSADD_BU); return true;}
+static bool trans_xvsadd_hu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVSADD_HU); return true;}
+static bool trans_xvsadd_wu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVSADD_WU); return true;}
+static bool trans_xvsadd_du(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVSADD_DU); return true;}
+static bool trans_xvssub_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSSUB_B); return true;}
+static bool trans_xvssub_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSSUB_H); return true;}
+static bool trans_xvssub_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSSUB_W); return true;}
+static bool trans_xvssub_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSSUB_D); return true;}
+static bool trans_xvssub_bu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVSSUB_BU); return true;}
+static bool trans_xvssub_hu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVSSUB_HU); return true;}
+static bool trans_xvssub_wu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVSSUB_WU); return true;}
+static bool trans_xvssub_du(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVSSUB_DU); return true;}
+static bool trans_xvhaddw_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVHADDW_H_B); return true;}
+static bool trans_xvhaddw_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVHADDW_W_H); return true;}
+static bool trans_xvhaddw_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVHADDW_D_W); return true;}
+static bool trans_xvhaddw_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVHADDW_Q_D); return true;}
+static bool trans_xvhaddw_hu_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVHADDW_HU_BU); return true;}
+static bool trans_xvhaddw_wu_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVHADDW_WU_HU); return true;}
+static bool trans_xvhaddw_du_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVHADDW_DU_WU); return true;}
+static bool trans_xvhaddw_qu_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVHADDW_QU_DU); return true;}
+static bool trans_xvhsubw_h_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVHSUBW_H_B); return true;}
+static bool trans_xvhsubw_w_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVHSUBW_W_H); return true;}
+static bool trans_xvhsubw_d_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVHSUBW_D_W); return true;}
+static bool trans_xvhsubw_q_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVHSUBW_Q_D); return true;}
+static bool trans_xvhsubw_hu_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVHSUBW_HU_BU); return true;}
+static bool trans_xvhsubw_wu_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVHSUBW_WU_HU); return true;}
+static bool trans_xvhsubw_du_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVHSUBW_DU_WU); return true;}
+static bool trans_xvhsubw_qu_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVHSUBW_QU_DU); return true;}
+static bool trans_xvaddwev_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVADDWEV_H_B); return true;}
+static bool trans_xvaddwev_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVADDWEV_W_H); return true;}
+static bool trans_xvaddwev_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVADDWEV_D_W); return true;}
+static bool trans_xvaddwev_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVADDWEV_Q_D); return true;}
+static bool trans_xvaddwod_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVADDWOD_H_B); return true;}
+static bool trans_xvaddwod_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVADDWOD_W_H); return true;}
+static bool trans_xvaddwod_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVADDWOD_D_W); return true;}
+static bool trans_xvaddwod_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVADDWOD_Q_D); return true;}
+static bool trans_xvsubwev_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSUBWEV_H_B); return true;}
+static bool trans_xvsubwev_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSUBWEV_W_H); return true;}
+static bool trans_xvsubwev_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSUBWEV_D_W); return true;}
+static bool trans_xvsubwev_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSUBWEV_Q_D); return true;}
+static bool trans_xvsubwod_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSUBWOD_H_B); return true;}
+static bool trans_xvsubwod_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSUBWOD_W_H); return true;}
+static bool trans_xvsubwod_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSUBWOD_D_W); return true;}
+static bool trans_xvsubwod_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSUBWOD_Q_D); return true;}
+static bool trans_xvaddwev_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVADDWEV_H_BU); return true;}
+static bool trans_xvaddwev_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVADDWEV_W_HU); return true;}
+static bool trans_xvaddwev_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVADDWEV_D_WU); return true;}
+static bool trans_xvaddwev_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVADDWEV_Q_DU); return true;}
+static bool trans_xvaddwod_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVADDWOD_H_BU); return true;}
+static bool trans_xvaddwod_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVADDWOD_W_HU); return true;}
+static bool trans_xvaddwod_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVADDWOD_D_WU); return true;}
+static bool trans_xvaddwod_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVADDWOD_Q_DU); return true;}
+static bool trans_xvsubwev_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVSUBWEV_H_BU); return true;}
+static bool trans_xvsubwev_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVSUBWEV_W_HU); return true;}
+static bool trans_xvsubwev_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVSUBWEV_D_WU); return true;}
+static bool trans_xvsubwev_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVSUBWEV_Q_DU); return true;}
+static bool trans_xvsubwod_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVSUBWOD_H_BU); return true;}
+static bool trans_xvsubwod_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVSUBWOD_W_HU); return true;}
+static bool trans_xvsubwod_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVSUBWOD_D_WU); return true;}
+static bool trans_xvsubwod_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVSUBWOD_Q_DU); return true;}
+static bool trans_xvaddwev_h_bu_b(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVADDWEV_H_BU_B); return true;}
+static bool trans_xvaddwev_w_hu_h(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVADDWEV_W_HU_H); return true;}
+static bool trans_xvaddwev_d_wu_w(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVADDWEV_D_WU_W); return true;}
+static bool trans_xvaddwev_q_du_d(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVADDWEV_Q_DU_D); return true;}
+static bool trans_xvaddwod_h_bu_b(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVADDWOD_H_BU_B); return true;}
+static bool trans_xvaddwod_w_hu_h(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVADDWOD_W_HU_H); return true;}
+static bool trans_xvaddwod_d_wu_w(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVADDWOD_D_WU_W); return true;}
+static bool trans_xvaddwod_q_du_d(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVADDWOD_Q_DU_D); return true;}
+static bool trans_xvavg_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVAVG_B); return true;}
+static bool trans_xvavg_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVAVG_H); return true;}
+static bool trans_xvavg_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVAVG_W); return true;}
+static bool trans_xvavg_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVAVG_D); return true;}
+static bool trans_xvavg_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVAVG_BU); return true;}
+static bool trans_xvavg_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVAVG_HU); return true;}
+static bool trans_xvavg_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVAVG_WU); return true;}
+static bool trans_xvavg_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVAVG_DU); return true;}
+static bool trans_xvavgr_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVAVGR_B); return true;}
+static bool trans_xvavgr_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVAVGR_H); return true;}
+static bool trans_xvavgr_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVAVGR_W); return true;}
+static bool trans_xvavgr_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVAVGR_D); return true;}
+static bool trans_xvavgr_bu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVAVGR_BU); return true;}
+static bool trans_xvavgr_hu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVAVGR_HU); return true;}
+static bool trans_xvavgr_wu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVAVGR_WU); return true;}
+static bool trans_xvavgr_du(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVAVGR_DU); return true;}
+static bool trans_xvabsd_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVABSD_B); return true;}
+static bool trans_xvabsd_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVABSD_H); return true;}
+static bool trans_xvabsd_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVABSD_W); return true;}
+static bool trans_xvabsd_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVABSD_D); return true;}
+static bool trans_xvabsd_bu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVABSD_BU); return true;}
+static bool trans_xvabsd_hu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVABSD_HU); return true;}
+static bool trans_xvabsd_wu(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVABSD_WU); return true;}
+static bool trans_xvabsd_du(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVABSD_DU); return true;}
+static bool trans_xvadda_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVADDA_B); return true;}
+static bool trans_xvadda_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVADDA_H); return true;}
+static bool trans_xvadda_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVADDA_W); return true;}
+static bool trans_xvadda_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVADDA_D); return true;}
+static bool trans_xvmax_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMAX_B); return true;}
+static bool trans_xvmax_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMAX_H); return true;}
+static bool trans_xvmax_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMAX_W); return true;}
+static bool trans_xvmax_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMAX_D); return true;}
+static bool trans_xvmax_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMAX_BU); return true;}
+static bool trans_xvmax_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMAX_HU); return true;}
+static bool trans_xvmax_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMAX_WU); return true;}
+static bool trans_xvmax_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMAX_DU); return true;}
+static bool trans_xvmaxi_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVMAXI_B); return true;}
+static bool trans_xvmaxi_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVMAXI_H); return true;}
+static bool trans_xvmaxi_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVMAXI_W); return true;}
+static bool trans_xvmaxi_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVMAXI_D); return true;}
+static bool trans_xvmaxi_bu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVMAXI_BU); return true;}
+static bool trans_xvmaxi_hu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVMAXI_HU); return true;}
+static bool trans_xvmaxi_wu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVMAXI_WU); return true;}
+static bool trans_xvmaxi_du(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVMAXI_DU); return true;}
+static bool trans_xvmin_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMIN_B); return true;}
+static bool trans_xvmin_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMIN_H); return true;}
+static bool trans_xvmin_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMIN_W); return true;}
+static bool trans_xvmin_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMIN_D); return true;}
+static bool trans_xvmin_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMIN_BU); return true;}
+static bool trans_xvmin_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMIN_HU); return true;}
+static bool trans_xvmin_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMIN_WU); return true;}
+static bool trans_xvmin_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMIN_DU); return true;}
+static bool trans_xvmini_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVMINI_B); return true;}
+static bool trans_xvmini_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVMINI_H); return true;}
+static bool trans_xvmini_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVMINI_W); return true;}
+static bool trans_xvmini_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVMINI_D); return true;}
+static bool trans_xvmini_bu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVMINI_BU); return true;}
+static bool trans_xvmini_hu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVMINI_HU); return true;}
+static bool trans_xvmini_wu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVMINI_WU); return true;}
+static bool trans_xvmini_du(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVMINI_DU); return true;}
+static bool trans_xvmul_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMUL_B); return true;}
+static bool trans_xvmul_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMUL_H); return true;}
+static bool trans_xvmul_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMUL_W); return true;}
+static bool trans_xvmul_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMUL_D); return true;}
+static bool trans_xvmuh_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMUH_B); return true;}
+static bool trans_xvmuh_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMUH_H); return true;}
+static bool trans_xvmuh_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMUH_W); return true;}
+static bool trans_xvmuh_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMUH_D); return true;}
+static bool trans_xvmuh_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMUH_BU); return true;}
+static bool trans_xvmuh_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMUH_HU); return true;}
+static bool trans_xvmuh_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMUH_WU); return true;}
+static bool trans_xvmuh_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMUH_DU); return true;}
+static bool trans_xvmulwev_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVMULWEV_H_B); return true;}
+static bool trans_xvmulwev_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVMULWEV_W_H); return true;}
+static bool trans_xvmulwev_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVMULWEV_D_W); return true;}
+static bool trans_xvmulwev_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVMULWEV_Q_D); return true;}
+static bool trans_xvmulwod_h_b(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVMULWOD_H_B); return true;}
+static bool trans_xvmulwod_w_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVMULWOD_W_H); return true;}
+static bool trans_xvmulwod_d_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVMULWOD_D_W); return true;}
+static bool trans_xvmulwod_q_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVMULWOD_Q_D); return true;}
+static bool trans_xvmulwev_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMULWEV_H_BU); return true;}
+static bool trans_xvmulwev_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMULWEV_W_HU); return true;}
+static bool trans_xvmulwev_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMULWEV_D_WU); return true;}
+static bool trans_xvmulwev_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMULWEV_Q_DU); return true;}
+static bool trans_xvmulwod_h_bu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMULWOD_H_BU); return true;}
+static bool trans_xvmulwod_w_hu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMULWOD_W_HU); return true;}
+static bool trans_xvmulwod_d_wu(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMULWOD_D_WU); return true;}
+static bool trans_xvmulwod_q_du(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMULWOD_Q_DU); return true;}
+static bool trans_xvmulwev_h_bu_b(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVMULWEV_H_BU_B); return true;}
+static bool trans_xvmulwev_w_hu_h(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVMULWEV_W_HU_H); return true;}
+static bool trans_xvmulwev_d_wu_w(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVMULWEV_D_WU_W); return true;}
+static bool trans_xvmulwev_q_du_d(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVMULWEV_Q_DU_D); return true;}
+static bool trans_xvmulwod_h_bu_b(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVMULWOD_H_BU_B); return true;}
+static bool trans_xvmulwod_w_hu_h(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVMULWOD_W_HU_H); return true;}
+static bool trans_xvmulwod_d_wu_w(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVMULWOD_D_WU_W); return true;}
+static bool trans_xvmulwod_q_du_d(DisasContext *ctx, arg_vvv *a)     {handle_arg_vvv(ctx, a, LA_INST_XVMULWOD_Q_DU_D); return true;}
+static bool trans_xvmadd_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMADD_B); return true;}
+static bool trans_xvmadd_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMADD_H); return true;}
+static bool trans_xvmadd_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMADD_W); return true;}
+static bool trans_xvmadd_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMADD_D); return true;}
+static bool trans_xvmsub_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMSUB_B); return true;}
+static bool trans_xvmsub_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMSUB_H); return true;}
+static bool trans_xvmsub_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMSUB_W); return true;}
+static bool trans_xvmsub_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMSUB_D); return true;}
+static bool trans_xvmaddwev_h_b(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMADDWEV_H_B); return true;}
+static bool trans_xvmaddwev_w_h(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMADDWEV_W_H); return true;}
+static bool trans_xvmaddwev_d_w(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMADDWEV_D_W); return true;}
+static bool trans_xvmaddwev_q_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMADDWEV_Q_D); return true;}
+static bool trans_xvmaddwod_h_b(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMADDWOD_H_B); return true;}
+static bool trans_xvmaddwod_w_h(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMADDWOD_W_H); return true;}
+static bool trans_xvmaddwod_d_w(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMADDWOD_D_W); return true;}
+static bool trans_xvmaddwod_q_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVMADDWOD_Q_D); return true;}
+static bool trans_xvmaddwev_h_bu(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_XVMADDWEV_H_BU); return true;}
+static bool trans_xvmaddwev_w_hu(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_XVMADDWEV_W_HU); return true;}
+static bool trans_xvmaddwev_d_wu(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_XVMADDWEV_D_WU); return true;}
+static bool trans_xvmaddwev_q_du(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_XVMADDWEV_Q_DU); return true;}
+static bool trans_xvmaddwod_h_bu(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_XVMADDWOD_H_BU); return true;}
+static bool trans_xvmaddwod_w_hu(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_XVMADDWOD_W_HU); return true;}
+static bool trans_xvmaddwod_d_wu(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_XVMADDWOD_D_WU); return true;}
+static bool trans_xvmaddwod_q_du(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_XVMADDWOD_Q_DU); return true;}
+static bool trans_xvmaddwev_h_bu_b(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(ctx, a, LA_INST_XVMADDWEV_H_BU_B); return true;}
+static bool trans_xvmaddwev_w_hu_h(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(ctx, a, LA_INST_XVMADDWEV_W_HU_H); return true;}
+static bool trans_xvmaddwev_d_wu_w(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(ctx, a, LA_INST_XVMADDWEV_D_WU_W); return true;}
+static bool trans_xvmaddwev_q_du_d(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(ctx, a, LA_INST_XVMADDWEV_Q_DU_D); return true;}
+static bool trans_xvmaddwod_h_bu_b(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(ctx, a, LA_INST_XVMADDWOD_H_BU_B); return true;}
+static bool trans_xvmaddwod_w_hu_h(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(ctx, a, LA_INST_XVMADDWOD_W_HU_H); return true;}
+static bool trans_xvmaddwod_d_wu_w(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(ctx, a, LA_INST_XVMADDWOD_D_WU_W); return true;}
+static bool trans_xvmaddwod_q_du_d(DisasContext *ctx, arg_vvv *a)    {handle_arg_vvv(ctx, a, LA_INST_XVMADDWOD_Q_DU_D); return true;}
+static bool trans_xvdiv_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVDIV_B); return true;}
+static bool trans_xvdiv_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVDIV_H); return true;}
+static bool trans_xvdiv_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVDIV_W); return true;}
+static bool trans_xvdiv_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVDIV_D); return true;}
+static bool trans_xvmod_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMOD_B); return true;}
+static bool trans_xvmod_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMOD_H); return true;}
+static bool trans_xvmod_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMOD_W); return true;}
+static bool trans_xvmod_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVMOD_D); return true;}
+static bool trans_xvdiv_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVDIV_BU); return true;}
+static bool trans_xvdiv_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVDIV_HU); return true;}
+static bool trans_xvdiv_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVDIV_WU); return true;}
+static bool trans_xvdiv_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVDIV_DU); return true;}
+static bool trans_xvmod_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMOD_BU); return true;}
+static bool trans_xvmod_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMOD_HU); return true;}
+static bool trans_xvmod_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMOD_WU); return true;}
+static bool trans_xvmod_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVMOD_DU); return true;}
+static bool trans_xvsat_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_XVSAT_B); return true;}
+static bool trans_xvsat_h(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_XVSAT_H); return true;}
+static bool trans_xvsat_w(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_XVSAT_W); return true;}
+static bool trans_xvsat_d(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_XVSAT_D); return true;}
+static bool trans_xvsat_bu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSAT_BU); return true;}
+static bool trans_xvsat_hu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSAT_HU); return true;}
+static bool trans_xvsat_wu(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSAT_WU); return true;}
+static bool trans_xvsat_du(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSAT_DU); return true;}
+static bool trans_xvexth_h_b(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVEXTH_H_B); return true;}
+static bool trans_xvexth_w_h(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVEXTH_W_H); return true;}
+static bool trans_xvexth_d_w(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVEXTH_D_W); return true;}
+static bool trans_xvexth_q_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVEXTH_Q_D); return true;}
+static bool trans_xvexth_hu_bu(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVEXTH_HU_BU); return true;}
+static bool trans_xvexth_wu_hu(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVEXTH_WU_HU); return true;}
+static bool trans_xvexth_du_wu(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVEXTH_DU_WU); return true;}
+static bool trans_xvexth_qu_du(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVEXTH_QU_DU); return true;}
+static bool trans_vext2xv_h_b(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VEXT2XV_H_B); return true;}
+static bool trans_vext2xv_w_b(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VEXT2XV_W_B); return true;}
+static bool trans_vext2xv_d_b(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VEXT2XV_D_B); return true;}
+static bool trans_vext2xv_w_h(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VEXT2XV_W_H); return true;}
+static bool trans_vext2xv_d_h(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VEXT2XV_D_H); return true;}
+static bool trans_vext2xv_d_w(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_VEXT2XV_D_W); return true;}
+static bool trans_vext2xv_hu_bu(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VEXT2XV_HU_BU); return true;}
+static bool trans_vext2xv_wu_bu(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VEXT2XV_WU_BU); return true;}
+static bool trans_vext2xv_du_bu(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VEXT2XV_DU_BU); return true;}
+static bool trans_vext2xv_wu_hu(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VEXT2XV_WU_HU); return true;}
+static bool trans_vext2xv_du_hu(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VEXT2XV_DU_HU); return true;}
+static bool trans_vext2xv_du_wu(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_VEXT2XV_DU_WU); return true;}
+static bool trans_xvsigncov_b(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSIGNCOV_B); return true;}
+static bool trans_xvsigncov_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSIGNCOV_H); return true;}
+static bool trans_xvsigncov_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSIGNCOV_W); return true;}
+static bool trans_xvsigncov_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSIGNCOV_D); return true;}
+static bool trans_xvmskltz_b(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVMSKLTZ_B); return true;}
+static bool trans_xvmskltz_h(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVMSKLTZ_H); return true;}
+static bool trans_xvmskltz_w(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVMSKLTZ_W); return true;}
+static bool trans_xvmskltz_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVMSKLTZ_D); return true;}
+static bool trans_xvmskgez_b(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVMSKGEZ_B); return true;}
+static bool trans_xvmsknz_b(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_XVMSKNZ_B); return true;}
+static bool trans_xvldi(DisasContext *ctx, arg_v_i *a)               {handle_arg_v_i(ctx, a, LA_INST_XVLDI); return true;}
+static bool trans_xvand_v(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVAND_V); return true;}
+static bool trans_xvor_v(DisasContext *ctx, arg_vvv *a)              {handle_arg_vvv(ctx, a, LA_INST_XVOR_V); return true;}
+static bool trans_xvxor_v(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVXOR_V); return true;}
+static bool trans_xvnor_v(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVNOR_V); return true;}
+static bool trans_xvandn_v(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVANDN_V); return true;}
+static bool trans_xvorn_v(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVORN_V); return true;}
+static bool trans_xvandi_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVANDI_B); return true;}
+static bool trans_xvori_b(DisasContext *ctx, arg_vv_i *a)            {handle_arg_vv_i(ctx, a, LA_INST_XVORI_B); return true;}
+static bool trans_xvxori_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVXORI_B); return true;}
+static bool trans_xvnori_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVNORI_B); return true;}
+static bool trans_xvsll_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSLL_B); return true;}
+static bool trans_xvsll_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSLL_H); return true;}
+static bool trans_xvsll_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSLL_W); return true;}
+static bool trans_xvsll_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSLL_D); return true;}
+static bool trans_xvslli_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSLLI_B); return true;}
+static bool trans_xvslli_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSLLI_H); return true;}
+static bool trans_xvslli_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSLLI_W); return true;}
+static bool trans_xvslli_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSLLI_D); return true;}
+static bool trans_xvsrl_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSRL_B); return true;}
+static bool trans_xvsrl_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSRL_H); return true;}
+static bool trans_xvsrl_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSRL_W); return true;}
+static bool trans_xvsrl_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSRL_D); return true;}
+static bool trans_xvsrli_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSRLI_B); return true;}
+static bool trans_xvsrli_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSRLI_H); return true;}
+static bool trans_xvsrli_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSRLI_W); return true;}
+static bool trans_xvsrli_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSRLI_D); return true;}
+static bool trans_xvsra_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSRA_B); return true;}
+static bool trans_xvsra_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSRA_H); return true;}
+static bool trans_xvsra_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSRA_W); return true;}
+static bool trans_xvsra_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSRA_D); return true;}
+static bool trans_xvsrai_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSRAI_B); return true;}
+static bool trans_xvsrai_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSRAI_H); return true;}
+static bool trans_xvsrai_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSRAI_W); return true;}
+static bool trans_xvsrai_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSRAI_D); return true;}
+static bool trans_xvrotr_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVROTR_B); return true;}
+static bool trans_xvrotr_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVROTR_H); return true;}
+static bool trans_xvrotr_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVROTR_W); return true;}
+static bool trans_xvrotr_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVROTR_D); return true;}
+static bool trans_xvrotri_b(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVROTRI_B); return true;}
+static bool trans_xvrotri_h(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVROTRI_H); return true;}
+static bool trans_xvrotri_w(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVROTRI_W); return true;}
+static bool trans_xvrotri_d(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVROTRI_D); return true;}
+static bool trans_xvsllwil_h_b(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSLLWIL_H_B); return true;}
+static bool trans_xvsllwil_w_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSLLWIL_W_H); return true;}
+static bool trans_xvsllwil_d_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSLLWIL_D_W); return true;}
+static bool trans_xvextl_q_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVEXTL_Q_D); return true;}
+static bool trans_xvsllwil_hu_bu(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVSLLWIL_HU_BU); return true;}
+static bool trans_xvsllwil_wu_hu(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVSLLWIL_WU_HU); return true;}
+static bool trans_xvsllwil_du_wu(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVSLLWIL_DU_WU); return true;}
+static bool trans_xvextl_qu_du(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVEXTL_QU_DU); return true;}
+static bool trans_xvsrlr_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSRLR_B); return true;}
+static bool trans_xvsrlr_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSRLR_H); return true;}
+static bool trans_xvsrlr_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSRLR_W); return true;}
+static bool trans_xvsrlr_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSRLR_D); return true;}
+static bool trans_xvsrlri_b(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSRLRI_B); return true;}
+static bool trans_xvsrlri_h(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSRLRI_H); return true;}
+static bool trans_xvsrlri_w(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSRLRI_W); return true;}
+static bool trans_xvsrlri_d(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSRLRI_D); return true;}
+static bool trans_xvsrar_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSRAR_B); return true;}
+static bool trans_xvsrar_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSRAR_H); return true;}
+static bool trans_xvsrar_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSRAR_W); return true;}
+static bool trans_xvsrar_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSRAR_D); return true;}
+static bool trans_xvsrari_b(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSRARI_B); return true;}
+static bool trans_xvsrari_h(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSRARI_H); return true;}
+static bool trans_xvsrari_w(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSRARI_W); return true;}
+static bool trans_xvsrari_d(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSRARI_D); return true;}
+static bool trans_xvsrln_b_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVSRLN_B_H); return true;}
+static bool trans_xvsrln_h_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVSRLN_H_W); return true;}
+static bool trans_xvsrln_w_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVSRLN_W_D); return true;}
+static bool trans_xvsran_b_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVSRAN_B_H); return true;}
+static bool trans_xvsran_h_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVSRAN_H_W); return true;}
+static bool trans_xvsran_w_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVSRAN_W_D); return true;}
+static bool trans_xvsrlni_b_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVSRLNI_B_H); return true;}
+static bool trans_xvsrlni_h_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVSRLNI_H_W); return true;}
+static bool trans_xvsrlni_w_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVSRLNI_W_D); return true;}
+static bool trans_xvsrlni_d_q(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVSRLNI_D_Q); return true;}
+static bool trans_xvsrani_b_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVSRANI_B_H); return true;}
+static bool trans_xvsrani_h_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVSRANI_H_W); return true;}
+static bool trans_xvsrani_w_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVSRANI_W_D); return true;}
+static bool trans_xvsrani_d_q(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVSRANI_D_Q); return true;}
+static bool trans_xvsrlrn_b_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSRLRN_B_H); return true;}
+static bool trans_xvsrlrn_h_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSRLRN_H_W); return true;}
+static bool trans_xvsrlrn_w_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSRLRN_W_D); return true;}
+static bool trans_xvsrarn_b_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSRARN_B_H); return true;}
+static bool trans_xvsrarn_h_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSRARN_H_W); return true;}
+static bool trans_xvsrarn_w_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSRARN_W_D); return true;}
+static bool trans_xvsrlrni_b_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSRLRNI_B_H); return true;}
+static bool trans_xvsrlrni_h_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSRLRNI_H_W); return true;}
+static bool trans_xvsrlrni_w_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSRLRNI_W_D); return true;}
+static bool trans_xvsrlrni_d_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSRLRNI_D_Q); return true;}
+static bool trans_xvsrarni_b_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSRARNI_B_H); return true;}
+static bool trans_xvsrarni_h_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSRARNI_H_W); return true;}
+static bool trans_xvsrarni_w_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSRARNI_W_D); return true;}
+static bool trans_xvsrarni_d_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSRARNI_D_Q); return true;}
+static bool trans_xvssrln_b_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSSRLN_B_H); return true;}
+static bool trans_xvssrln_h_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSSRLN_H_W); return true;}
+static bool trans_xvssrln_w_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSSRLN_W_D); return true;}
+static bool trans_xvssran_b_h(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSSRAN_B_H); return true;}
+static bool trans_xvssran_h_w(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSSRAN_H_W); return true;}
+static bool trans_xvssran_w_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVSSRAN_W_D); return true;}
+static bool trans_xvssrln_bu_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSSRLN_BU_H); return true;}
+static bool trans_xvssrln_hu_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSSRLN_HU_W); return true;}
+static bool trans_xvssrln_wu_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSSRLN_WU_D); return true;}
+static bool trans_xvssran_bu_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSSRAN_BU_H); return true;}
+static bool trans_xvssran_hu_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSSRAN_HU_W); return true;}
+static bool trans_xvssran_wu_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSSRAN_WU_D); return true;}
+static bool trans_xvssrlni_b_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLNI_B_H); return true;}
+static bool trans_xvssrlni_h_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLNI_H_W); return true;}
+static bool trans_xvssrlni_w_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLNI_W_D); return true;}
+static bool trans_xvssrlni_d_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLNI_D_Q); return true;}
+static bool trans_xvssrani_b_h(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSSRANI_B_H); return true;}
+static bool trans_xvssrani_h_w(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSSRANI_H_W); return true;}
+static bool trans_xvssrani_w_d(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSSRANI_W_D); return true;}
+static bool trans_xvssrani_d_q(DisasContext *ctx, arg_vv_i *a)       {handle_arg_vv_i(ctx, a, LA_INST_XVSSRANI_D_Q); return true;}
+static bool trans_xvssrlni_bu_h(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLNI_BU_H); return true;}
+static bool trans_xvssrlni_hu_w(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLNI_HU_W); return true;}
+static bool trans_xvssrlni_wu_d(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLNI_WU_D); return true;}
+static bool trans_xvssrlni_du_q(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLNI_DU_Q); return true;}
+static bool trans_xvssrani_bu_h(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRANI_BU_H); return true;}
+static bool trans_xvssrani_hu_w(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRANI_HU_W); return true;}
+static bool trans_xvssrani_wu_d(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRANI_WU_D); return true;}
+static bool trans_xvssrani_du_q(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRANI_DU_Q); return true;}
+static bool trans_xvssrlrn_b_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSSRLRN_B_H); return true;}
+static bool trans_xvssrlrn_h_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSSRLRN_H_W); return true;}
+static bool trans_xvssrlrn_w_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSSRLRN_W_D); return true;}
+static bool trans_xvssrarn_b_h(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSSRARN_B_H); return true;}
+static bool trans_xvssrarn_h_w(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSSRARN_H_W); return true;}
+static bool trans_xvssrarn_w_d(DisasContext *ctx, arg_vvv *a)        {handle_arg_vvv(ctx, a, LA_INST_XVSSRARN_W_D); return true;}
+static bool trans_xvssrlrn_bu_h(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVSSRLRN_BU_H); return true;}
+static bool trans_xvssrlrn_hu_w(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVSSRLRN_HU_W); return true;}
+static bool trans_xvssrlrn_wu_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVSSRLRN_WU_D); return true;}
+static bool trans_xvssrarn_bu_h(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVSSRARN_BU_H); return true;}
+static bool trans_xvssrarn_hu_w(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVSSRARN_HU_W); return true;}
+static bool trans_xvssrarn_wu_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVSSRARN_WU_D); return true;}
+static bool trans_xvssrlrni_b_h(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLRNI_B_H); return true;}
+static bool trans_xvssrlrni_h_w(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLRNI_H_W); return true;}
+static bool trans_xvssrlrni_w_d(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLRNI_W_D); return true;}
+static bool trans_xvssrlrni_d_q(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLRNI_D_Q); return true;}
+static bool trans_xvssrarni_b_h(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRARNI_B_H); return true;}
+static bool trans_xvssrarni_h_w(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRARNI_H_W); return true;}
+static bool trans_xvssrarni_w_d(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRARNI_W_D); return true;}
+static bool trans_xvssrarni_d_q(DisasContext *ctx, arg_vv_i *a)      {handle_arg_vv_i(ctx, a, LA_INST_XVSSRARNI_D_Q); return true;}
+static bool trans_xvssrlrni_bu_h(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLRNI_BU_H); return true;}
+static bool trans_xvssrlrni_hu_w(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLRNI_HU_W); return true;}
+static bool trans_xvssrlrni_wu_d(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLRNI_WU_D); return true;}
+static bool trans_xvssrlrni_du_q(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVSSRLRNI_DU_Q); return true;}
+static bool trans_xvssrarni_bu_h(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVSSRARNI_BU_H); return true;}
+static bool trans_xvssrarni_hu_w(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVSSRARNI_HU_W); return true;}
+static bool trans_xvssrarni_wu_d(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVSSRARNI_WU_D); return true;}
+static bool trans_xvssrarni_du_q(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVSSRARNI_DU_Q); return true;}
+static bool trans_xvclo_b(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_XVCLO_B); return true;}
+static bool trans_xvclo_h(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_XVCLO_H); return true;}
+static bool trans_xvclo_w(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_XVCLO_W); return true;}
+static bool trans_xvclo_d(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_XVCLO_D); return true;}
+static bool trans_xvclz_b(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_XVCLZ_B); return true;}
+static bool trans_xvclz_h(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_XVCLZ_H); return true;}
+static bool trans_xvclz_w(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_XVCLZ_W); return true;}
+static bool trans_xvclz_d(DisasContext *ctx, arg_vv *a)              {handle_arg_vv(ctx, a, LA_INST_XVCLZ_D); return true;}
+static bool trans_xvpcnt_b(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(ctx, a, LA_INST_XVPCNT_B); return true;}
+static bool trans_xvpcnt_h(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(ctx, a, LA_INST_XVPCNT_H); return true;}
+static bool trans_xvpcnt_w(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(ctx, a, LA_INST_XVPCNT_W); return true;}
+static bool trans_xvpcnt_d(DisasContext *ctx, arg_vv *a)             {handle_arg_vv(ctx, a, LA_INST_XVPCNT_D); return true;}
+static bool trans_xvbitclr_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVBITCLR_B); return true;}
+static bool trans_xvbitclr_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVBITCLR_H); return true;}
+static bool trans_xvbitclr_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVBITCLR_W); return true;}
+static bool trans_xvbitclr_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVBITCLR_D); return true;}
+static bool trans_xvbitclri_b(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVBITCLRI_B); return true;}
+static bool trans_xvbitclri_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVBITCLRI_H); return true;}
+static bool trans_xvbitclri_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVBITCLRI_W); return true;}
+static bool trans_xvbitclri_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVBITCLRI_D); return true;}
+static bool trans_xvbitset_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVBITSET_B); return true;}
+static bool trans_xvbitset_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVBITSET_H); return true;}
+static bool trans_xvbitset_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVBITSET_W); return true;}
+static bool trans_xvbitset_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVBITSET_D); return true;}
+static bool trans_xvbitseti_b(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVBITSETI_B); return true;}
+static bool trans_xvbitseti_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVBITSETI_H); return true;}
+static bool trans_xvbitseti_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVBITSETI_W); return true;}
+static bool trans_xvbitseti_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVBITSETI_D); return true;}
+static bool trans_xvbitrev_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVBITREV_B); return true;}
+static bool trans_xvbitrev_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVBITREV_H); return true;}
+static bool trans_xvbitrev_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVBITREV_W); return true;}
+static bool trans_xvbitrev_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVBITREV_D); return true;}
+static bool trans_xvbitrevi_b(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVBITREVI_B); return true;}
+static bool trans_xvbitrevi_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVBITREVI_H); return true;}
+static bool trans_xvbitrevi_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVBITREVI_W); return true;}
+static bool trans_xvbitrevi_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVBITREVI_D); return true;}
+static bool trans_xvfrstp_b(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVFRSTP_B); return true;}
+static bool trans_xvfrstp_h(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVFRSTP_H); return true;}
+static bool trans_xvfrstpi_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_XVFRSTPI_B); return true;}
+static bool trans_xvfrstpi_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_XVFRSTPI_H); return true;}
+static bool trans_xvfadd_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVFADD_S); return true;}
+static bool trans_xvfadd_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVFADD_D); return true;}
+static bool trans_xvfsub_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVFSUB_S); return true;}
+static bool trans_xvfsub_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVFSUB_D); return true;}
+static bool trans_xvfmul_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVFMUL_S); return true;}
+static bool trans_xvfmul_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVFMUL_D); return true;}
+static bool trans_xvfdiv_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVFDIV_S); return true;}
+static bool trans_xvfdiv_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVFDIV_D); return true;}
+static bool trans_xvfmadd_s(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(ctx, a, LA_INST_XVFMADD_S); return true;}
+static bool trans_xvfmadd_d(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(ctx, a, LA_INST_XVFMADD_D); return true;}
+static bool trans_xvfmsub_s(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(ctx, a, LA_INST_XVFMSUB_S); return true;}
+static bool trans_xvfmsub_d(DisasContext *ctx, arg_vvvv *a)          {handle_arg_vvvv(ctx, a, LA_INST_XVFMSUB_D); return true;}
+static bool trans_xvfnmadd_s(DisasContext *ctx, arg_vvvv *a)         {handle_arg_vvvv(ctx, a, LA_INST_XVFNMADD_S); return true;}
+static bool trans_xvfnmadd_d(DisasContext *ctx, arg_vvvv *a)         {handle_arg_vvvv(ctx, a, LA_INST_XVFNMADD_D); return true;}
+static bool trans_xvfnmsub_s(DisasContext *ctx, arg_vvvv *a)         {handle_arg_vvvv(ctx, a, LA_INST_XVFNMSUB_S); return true;}
+static bool trans_xvfnmsub_d(DisasContext *ctx, arg_vvvv *a)         {handle_arg_vvvv(ctx, a, LA_INST_XVFNMSUB_D); return true;}
+static bool trans_xvfmax_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVFMAX_S); return true;}
+static bool trans_xvfmax_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVFMAX_D); return true;}
+static bool trans_xvfmin_s(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVFMIN_S); return true;}
+static bool trans_xvfmin_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVFMIN_D); return true;}
+static bool trans_xvfmaxa_s(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVFMAXA_S); return true;}
+static bool trans_xvfmaxa_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVFMAXA_D); return true;}
+static bool trans_xvfmina_s(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVFMINA_S); return true;}
+static bool trans_xvfmina_d(DisasContext *ctx, arg_vvv *a)           {handle_arg_vvv(ctx, a, LA_INST_XVFMINA_D); return true;}
+static bool trans_xvflogb_s(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_XVFLOGB_S); return true;}
+static bool trans_xvflogb_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_XVFLOGB_D); return true;}
+static bool trans_xvfclass_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVFCLASS_S); return true;}
+static bool trans_xvfclass_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVFCLASS_D); return true;}
+static bool trans_xvfsqrt_s(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_XVFSQRT_S); return true;}
+static bool trans_xvfsqrt_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_XVFSQRT_D); return true;}
+static bool trans_xvfrecip_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVFRECIP_S); return true;}
+static bool trans_xvfrecip_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVFRECIP_D); return true;}
+static bool trans_xvfrsqrt_s(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVFRSQRT_S); return true;}
+static bool trans_xvfrsqrt_d(DisasContext *ctx, arg_vv *a)           {handle_arg_vv(ctx, a, LA_INST_XVFRSQRT_D); return true;}
+static bool trans_xvfcvtl_s_h(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVFCVTL_S_H); return true;}
+static bool trans_xvfcvth_s_h(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVFCVTH_S_H); return true;}
+static bool trans_xvfcvtl_d_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVFCVTL_D_S); return true;}
+static bool trans_xvfcvth_d_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVFCVTH_D_S); return true;}
+static bool trans_xvfcvt_h_s(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVFCVT_H_S); return true;}
+static bool trans_xvfcvt_s_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVFCVT_S_D); return true;}
+static bool trans_xvfrintrne_s(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVFRINTRNE_S); return true;}
+static bool trans_xvfrintrne_d(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVFRINTRNE_D); return true;}
+static bool trans_xvfrintrz_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVFRINTRZ_S); return true;}
+static bool trans_xvfrintrz_d(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVFRINTRZ_D); return true;}
+static bool trans_xvfrintrp_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVFRINTRP_S); return true;}
+static bool trans_xvfrintrp_d(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVFRINTRP_D); return true;}
+static bool trans_xvfrintrm_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVFRINTRM_S); return true;}
+static bool trans_xvfrintrm_d(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVFRINTRM_D); return true;}
+static bool trans_xvfrint_s(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_XVFRINT_S); return true;}
+static bool trans_xvfrint_d(DisasContext *ctx, arg_vv *a)            {handle_arg_vv(ctx, a, LA_INST_XVFRINT_D); return true;}
+static bool trans_xvftintrne_w_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(ctx, a, LA_INST_XVFTINTRNE_W_S); return true;}
+static bool trans_xvftintrne_l_d(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(ctx, a, LA_INST_XVFTINTRNE_L_D); return true;}
+static bool trans_xvftintrz_w_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_XVFTINTRZ_W_S); return true;}
+static bool trans_xvftintrz_l_d(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_XVFTINTRZ_L_D); return true;}
+static bool trans_xvftintrp_w_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_XVFTINTRP_W_S); return true;}
+static bool trans_xvftintrp_l_d(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_XVFTINTRP_L_D); return true;}
+static bool trans_xvftintrm_w_s(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_XVFTINTRM_W_S); return true;}
+static bool trans_xvftintrm_l_d(DisasContext *ctx, arg_vv *a)        {handle_arg_vv(ctx, a, LA_INST_XVFTINTRM_L_D); return true;}
+static bool trans_xvftint_w_s(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVFTINT_W_S); return true;}
+static bool trans_xvftint_l_d(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVFTINT_L_D); return true;}
+static bool trans_xvftintrz_wu_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(ctx, a, LA_INST_XVFTINTRZ_WU_S); return true;}
+static bool trans_xvftintrz_lu_d(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(ctx, a, LA_INST_XVFTINTRZ_LU_D); return true;}
+static bool trans_xvftint_wu_s(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVFTINT_WU_S); return true;}
+static bool trans_xvftint_lu_d(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVFTINT_LU_D); return true;}
+static bool trans_xvftintrne_w_d(DisasContext *ctx, arg_vvv *a)      {handle_arg_vvv(ctx, a, LA_INST_XVFTINTRNE_W_D); return true;}
+static bool trans_xvftintrz_w_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVFTINTRZ_W_D); return true;}
+static bool trans_xvftintrp_w_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVFTINTRP_W_D); return true;}
+static bool trans_xvftintrm_w_d(DisasContext *ctx, arg_vvv *a)       {handle_arg_vvv(ctx, a, LA_INST_XVFTINTRM_W_D); return true;}
+static bool trans_xvftint_w_d(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVFTINT_W_D); return true;}
+static bool trans_xvftintrnel_l_s(DisasContext *ctx, arg_vv *a)      {handle_arg_vv(ctx, a, LA_INST_XVFTINTRNEL_L_S); return true;}
+static bool trans_xvftintrneh_l_s(DisasContext *ctx, arg_vv *a)      {handle_arg_vv(ctx, a, LA_INST_XVFTINTRNEH_L_S); return true;}
+static bool trans_xvftintrzl_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(ctx, a, LA_INST_XVFTINTRZL_L_S); return true;}
+static bool trans_xvftintrzh_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(ctx, a, LA_INST_XVFTINTRZH_L_S); return true;}
+static bool trans_xvftintrpl_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(ctx, a, LA_INST_XVFTINTRPL_L_S); return true;}
+static bool trans_xvftintrph_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(ctx, a, LA_INST_XVFTINTRPH_L_S); return true;}
+static bool trans_xvftintrml_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(ctx, a, LA_INST_XVFTINTRML_L_S); return true;}
+static bool trans_xvftintrmh_l_s(DisasContext *ctx, arg_vv *a)       {handle_arg_vv(ctx, a, LA_INST_XVFTINTRMH_L_S); return true;}
+static bool trans_xvftintl_l_s(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVFTINTL_L_S); return true;}
+static bool trans_xvftinth_l_s(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVFTINTH_L_S); return true;}
+static bool trans_xvffint_s_w(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVFFINT_S_W); return true;}
+static bool trans_xvffint_d_l(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVFFINT_D_L); return true;}
+static bool trans_xvffint_s_wu(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVFFINT_S_WU); return true;}
+static bool trans_xvffint_d_lu(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVFFINT_D_LU); return true;}
+static bool trans_xvffintl_d_w(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVFFINTL_D_W); return true;}
+static bool trans_xvffinth_d_w(DisasContext *ctx, arg_vv *a)         {handle_arg_vv(ctx, a, LA_INST_XVFFINTH_D_W); return true;}
+static bool trans_xvffint_s_l(DisasContext *ctx, arg_vvv *a)         {handle_arg_vvv(ctx, a, LA_INST_XVFFINT_S_L); return true;}
+static bool trans_xvseq_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSEQ_B); return true;}
+static bool trans_xvseq_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSEQ_H); return true;}
+static bool trans_xvseq_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSEQ_W); return true;}
+static bool trans_xvseq_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSEQ_D); return true;}
+static bool trans_xvseqi_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSEQI_B); return true;}
+static bool trans_xvseqi_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSEQI_H); return true;}
+static bool trans_xvseqi_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSEQI_W); return true;}
+static bool trans_xvseqi_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSEQI_D); return true;}
+static bool trans_xvsle_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSLE_B); return true;}
+static bool trans_xvsle_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSLE_H); return true;}
+static bool trans_xvsle_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSLE_W); return true;}
+static bool trans_xvsle_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSLE_D); return true;}
+static bool trans_xvslei_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSLEI_B); return true;}
+static bool trans_xvslei_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSLEI_H); return true;}
+static bool trans_xvslei_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSLEI_W); return true;}
+static bool trans_xvslei_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSLEI_D); return true;}
+static bool trans_xvsle_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSLE_BU); return true;}
+static bool trans_xvsle_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSLE_HU); return true;}
+static bool trans_xvsle_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSLE_WU); return true;}
+static bool trans_xvsle_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSLE_DU); return true;}
+static bool trans_xvslei_bu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSLEI_BU); return true;}
+static bool trans_xvslei_hu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSLEI_HU); return true;}
+static bool trans_xvslei_wu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSLEI_WU); return true;}
+static bool trans_xvslei_du(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSLEI_DU); return true;}
+static bool trans_xvslt_b(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSLT_B); return true;}
+static bool trans_xvslt_h(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSLT_H); return true;}
+static bool trans_xvslt_w(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSLT_W); return true;}
+static bool trans_xvslt_d(DisasContext *ctx, arg_vvv *a)             {handle_arg_vvv(ctx, a, LA_INST_XVSLT_D); return true;}
+static bool trans_xvslti_b(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSLTI_B); return true;}
+static bool trans_xvslti_h(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSLTI_H); return true;}
+static bool trans_xvslti_w(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSLTI_W); return true;}
+static bool trans_xvslti_d(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVSLTI_D); return true;}
+static bool trans_xvslt_bu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSLT_BU); return true;}
+static bool trans_xvslt_hu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSLT_HU); return true;}
+static bool trans_xvslt_wu(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSLT_WU); return true;}
+static bool trans_xvslt_du(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSLT_DU); return true;}
+static bool trans_xvslti_bu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSLTI_BU); return true;}
+static bool trans_xvslti_hu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSLTI_HU); return true;}
+static bool trans_xvslti_wu(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSLTI_WU); return true;}
+static bool trans_xvslti_du(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVSLTI_DU); return true;}
+static bool trans_xvfcmp_cond_s(DisasContext *ctx, arg_vvv_fcond *a) {handle_arg_vvv_fcond(ctx, a, LA_INST_XVFCMP_COND_S); return true;}
+static bool trans_xvfcmp_cond_d(DisasContext *ctx, arg_vvv_fcond *a) {handle_arg_vvv_fcond(ctx, a, LA_INST_XVFCMP_COND_D); return true;}
+static bool trans_xvbitsel_v(DisasContext *ctx, arg_vvvv *a)         {handle_arg_vvvv(ctx, a, LA_INST_XVBITSEL_V); return true;}
+static bool trans_xvbitseli_b(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVBITSELI_B); return true;}
+static bool trans_xvseteqz_v(DisasContext *ctx, arg_cv *a)           {handle_arg_cv(ctx, a, LA_INST_XVSETEQZ_V); return true;}
+static bool trans_xvsetnez_v(DisasContext *ctx, arg_cv *a)           {handle_arg_cv(ctx, a, LA_INST_XVSETNEZ_V); return true;}
+static bool trans_xvsetanyeqz_b(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(ctx, a, LA_INST_XVSETANYEQZ_B); return true;}
+static bool trans_xvsetanyeqz_h(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(ctx, a, LA_INST_XVSETANYEQZ_H); return true;}
+static bool trans_xvsetanyeqz_w(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(ctx, a, LA_INST_XVSETANYEQZ_W); return true;}
+static bool trans_xvsetanyeqz_d(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(ctx, a, LA_INST_XVSETANYEQZ_D); return true;}
+static bool trans_xvsetallnez_b(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(ctx, a, LA_INST_XVSETALLNEZ_B); return true;}
+static bool trans_xvsetallnez_h(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(ctx, a, LA_INST_XVSETALLNEZ_H); return true;}
+static bool trans_xvsetallnez_w(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(ctx, a, LA_INST_XVSETALLNEZ_W); return true;}
+static bool trans_xvsetallnez_d(DisasContext *ctx, arg_cv *a)        {handle_arg_cv(ctx, a, LA_INST_XVSETALLNEZ_D); return true;}
+static bool trans_xvinsgr2vr_w(DisasContext *ctx, arg_vr_i *a)       {handle_arg_vr_i(ctx, a, LA_INST_XVINSGR2VR_W); return true;}
+static bool trans_xvinsgr2vr_d(DisasContext *ctx, arg_vr_i *a)       {handle_arg_vr_i(ctx, a, LA_INST_XVINSGR2VR_D); return true;}
+static bool trans_xvpickve2gr_w(DisasContext *ctx, arg_rv_i *a)      {handle_arg_rv_i(ctx, a, LA_INST_XVPICKVE2GR_W); return true;}
+static bool trans_xvpickve2gr_d(DisasContext *ctx, arg_rv_i *a)      {handle_arg_rv_i(ctx, a, LA_INST_XVPICKVE2GR_D); return true;}
+static bool trans_xvpickve2gr_wu(DisasContext *ctx, arg_rv_i *a)     {handle_arg_rv_i(ctx, a, LA_INST_XVPICKVE2GR_WU); return true;}
+static bool trans_xvpickve2gr_du(DisasContext *ctx, arg_rv_i *a)     {handle_arg_rv_i(ctx, a, LA_INST_XVPICKVE2GR_DU); return true;}
+static bool trans_xvreplgr2vr_b(DisasContext *ctx, arg_vr *a)        {handle_arg_vr(ctx, a, LA_INST_XVREPLGR2VR_B); return true;}
+static bool trans_xvreplgr2vr_h(DisasContext *ctx, arg_vr *a)        {handle_arg_vr(ctx, a, LA_INST_XVREPLGR2VR_H); return true;}
+static bool trans_xvreplgr2vr_w(DisasContext *ctx, arg_vr *a)        {handle_arg_vr(ctx, a, LA_INST_XVREPLGR2VR_W); return true;}
+static bool trans_xvreplgr2vr_d(DisasContext *ctx, arg_vr *a)        {handle_arg_vr(ctx, a, LA_INST_XVREPLGR2VR_D); return true;}
+static bool trans_xvreplve_b(DisasContext *ctx, arg_vvr *a)          {handle_arg_vvr(ctx, a, LA_INST_XVREPLVE_B); return true;}
+static bool trans_xvreplve_h(DisasContext *ctx, arg_vvr *a)          {handle_arg_vvr(ctx, a, LA_INST_XVREPLVE_H); return true;}
+static bool trans_xvreplve_w(DisasContext *ctx, arg_vvr *a)          {handle_arg_vvr(ctx, a, LA_INST_XVREPLVE_W); return true;}
+static bool trans_xvreplve_d(DisasContext *ctx, arg_vvr *a)          {handle_arg_vvr(ctx, a, LA_INST_XVREPLVE_D); return true;}
+static bool trans_xvrepl128vei_b(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVREPL128VEI_B); return true;}
+static bool trans_xvrepl128vei_h(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVREPL128VEI_H); return true;}
+static bool trans_xvrepl128vei_w(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVREPL128VEI_W); return true;}
+static bool trans_xvrepl128vei_d(DisasContext *ctx, arg_vv_i *a)     {handle_arg_vv_i(ctx, a, LA_INST_XVREPL128VEI_D); return true;}
+static bool trans_xvreplve0_b(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVREPLVE0_B); return true;}
+static bool trans_xvreplve0_h(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVREPLVE0_H); return true;}
+static bool trans_xvreplve0_w(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVREPLVE0_W); return true;}
+static bool trans_xvreplve0_d(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVREPLVE0_D); return true;}
+static bool trans_xvreplve0_q(DisasContext *ctx, arg_vv *a)          {handle_arg_vv(ctx, a, LA_INST_XVREPLVE0_Q); return true;}
+static bool trans_xvinsve0_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_XVINSVE0_W); return true;}
+static bool trans_xvinsve0_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_XVINSVE0_D); return true;}
+static bool trans_xvpickve_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_XVPICKVE_W); return true;}
+static bool trans_xvpickve_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_XVPICKVE_D); return true;}
+static bool trans_xvbsll_v(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVBSLL_V); return true;}
+static bool trans_xvbsrl_v(DisasContext *ctx, arg_vv_i *a)           {handle_arg_vv_i(ctx, a, LA_INST_XVBSRL_V); return true;}
+static bool trans_xvpackev_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPACKEV_B); return true;}
+static bool trans_xvpackev_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPACKEV_H); return true;}
+static bool trans_xvpackev_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPACKEV_W); return true;}
+static bool trans_xvpackev_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPACKEV_D); return true;}
+static bool trans_xvpackod_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPACKOD_B); return true;}
+static bool trans_xvpackod_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPACKOD_H); return true;}
+static bool trans_xvpackod_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPACKOD_W); return true;}
+static bool trans_xvpackod_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPACKOD_D); return true;}
+static bool trans_xvpickev_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPICKEV_B); return true;}
+static bool trans_xvpickev_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPICKEV_H); return true;}
+static bool trans_xvpickev_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPICKEV_W); return true;}
+static bool trans_xvpickev_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPICKEV_D); return true;}
+static bool trans_xvpickod_b(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPICKOD_B); return true;}
+static bool trans_xvpickod_h(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPICKOD_H); return true;}
+static bool trans_xvpickod_w(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPICKOD_W); return true;}
+static bool trans_xvpickod_d(DisasContext *ctx, arg_vvv *a)          {handle_arg_vvv(ctx, a, LA_INST_XVPICKOD_D); return true;}
+static bool trans_xvilvl_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVILVL_B); return true;}
+static bool trans_xvilvl_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVILVL_H); return true;}
+static bool trans_xvilvl_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVILVL_W); return true;}
+static bool trans_xvilvl_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVILVL_D); return true;}
+static bool trans_xvilvh_b(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVILVH_B); return true;}
+static bool trans_xvilvh_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVILVH_H); return true;}
+static bool trans_xvilvh_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVILVH_W); return true;}
+static bool trans_xvilvh_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVILVH_D); return true;}
+static bool trans_xvshuf_b(DisasContext *ctx, arg_vvvv *a)           {handle_arg_vvvv(ctx, a, LA_INST_XVSHUF_B); return true;}
+static bool trans_xvshuf_h(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSHUF_H); return true;}
+static bool trans_xvshuf_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSHUF_W); return true;}
+static bool trans_xvshuf_d(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVSHUF_D); return true;}
+static bool trans_xvperm_w(DisasContext *ctx, arg_vvv *a)            {handle_arg_vvv(ctx, a, LA_INST_XVPERM_W); return true;}
+static bool trans_xvshuf4i_b(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_XVSHUF4I_B); return true;}
+static bool trans_xvshuf4i_h(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_XVSHUF4I_H); return true;}
+static bool trans_xvshuf4i_w(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_XVSHUF4I_W); return true;}
+static bool trans_xvshuf4i_d(DisasContext *ctx, arg_vv_i *a)         {handle_arg_vv_i(ctx, a, LA_INST_XVSHUF4I_D); return true;}
+static bool trans_xvpermi_w(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVPERMI_W); return true;}
+static bool trans_xvpermi_d(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVPERMI_D); return true;}
+static bool trans_xvpermi_q(DisasContext *ctx, arg_vv_i *a)          {handle_arg_vv_i(ctx, a, LA_INST_XVPERMI_Q); return true;}
+static bool trans_xvextrins_d(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVEXTRINS_D); return true;}
+static bool trans_xvextrins_w(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVEXTRINS_W); return true;}
+static bool trans_xvextrins_h(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVEXTRINS_H); return true;}
+static bool trans_xvextrins_b(DisasContext *ctx, arg_vv_i *a)        {handle_arg_vv_i(ctx, a, LA_INST_XVEXTRINS_B); return true;}
+static bool trans_xvld(DisasContext *ctx, arg_vr_i *a)               {handle_arg_vr_i(ctx, a, LA_INST_XVLD); return true;}
+static bool trans_xvst(DisasContext *ctx, arg_vr_i *a)               {handle_arg_vr_i(ctx, a, LA_INST_XVST); return true;}
+static bool trans_xvldx(DisasContext *ctx, arg_vrr *a)               {handle_arg_vrr(ctx, a, LA_INST_XVLDX); return true;}
+static bool trans_xvstx(DisasContext *ctx, arg_vrr *a)               {handle_arg_vrr(ctx, a, LA_INST_XVSTX); return true;}
+static bool trans_xvldrepl_d(DisasContext *ctx, arg_vr_i *a)         {handle_arg_vr_i(ctx, a, LA_INST_XVLDREPL_D); return true;}
+static bool trans_xvldrepl_w(DisasContext *ctx, arg_vr_i *a)         {handle_arg_vr_i(ctx, a, LA_INST_XVLDREPL_W); return true;}
+static bool trans_xvldrepl_h(DisasContext *ctx, arg_vr_i *a)         {handle_arg_vr_i(ctx, a, LA_INST_XVLDREPL_H); return true;}
+static bool trans_xvldrepl_b(DisasContext *ctx, arg_vr_i *a)         {handle_arg_vr_i(ctx, a, LA_INST_XVLDREPL_B); return true;}
+static bool trans_xvstelm_d(DisasContext *ctx, arg_vr_ii *a)         {handle_arg_vr_ii(ctx, a, LA_INST_XVSTELM_D); return true;}
+static bool trans_xvstelm_w(DisasContext *ctx, arg_vr_ii *a)         {handle_arg_vr_ii(ctx, a, LA_INST_XVSTELM_W); return true;}
+static bool trans_xvstelm_h(DisasContext *ctx, arg_vr_ii *a)         {handle_arg_vr_ii(ctx, a, LA_INST_XVSTELM_H); return true;}
+static bool trans_xvstelm_b(DisasContext *ctx, arg_vr_ii *a)         {handle_arg_vr_ii(ctx, a, LA_INST_XVSTELM_B); return true;}
 
 static bool la_inst_is_ist(int id) {
     switch (id) {
