@@ -127,6 +127,10 @@ static void vcpu_syscall_ret(qemu_plugin_id_t id, unsigned int vcpu_idx,
     fprintf(syscall_file, "icount:%ld, syscall #%" PRIi64 " returned -> %" PRIi64 "\n", icount, num, ret);
 }
 
+static void vcpu_init(qemu_plugin_id_t id, unsigned int vcpu_index) {
+    fprintf(stderr, "cpu %d created\n", vcpu_index);
+}
+
 QEMU_PLUGIN_EXPORT
 int qemu_plugin_install(qemu_plugin_id_t id, const qemu_info_t *info,
                         int argc, char **argv)
@@ -146,5 +150,6 @@ int qemu_plugin_install(qemu_plugin_id_t id, const qemu_info_t *info,
     qemu_plugin_register_atexit_cb(id, plugin_exit, NULL);
     qemu_plugin_register_vcpu_syscall_cb(id, vcpu_syscall);
     qemu_plugin_register_vcpu_syscall_ret_cb(id, vcpu_syscall_ret);
+    qemu_plugin_register_vcpu_init_cb(id, vcpu_init);
     return 0;
 }
