@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include <stdlib.h>
 long self_ptr = (long)&self_ptr;
+long N = 1000000000;
 __attribute__ ((noinline, aligned(4096))) unsigned add_chain(unsigned a) {
-    register long i = 1000000000;
+    register long i = N;
     register unsigned r = a;
     do {
         r <<= r;
@@ -19,7 +21,7 @@ __attribute__ ((noinline, aligned(4096))) unsigned add_chain(unsigned a) {
 }
 
 __attribute__ ((noinline, aligned(4096))) long ptr_chain(long ptr) {
-    register long i = 1000000000;
+    register long i = N;
     volatile register long* p = (long*)ptr;
     do {
         p = (long*)*p;
@@ -38,6 +40,9 @@ __attribute__ ((noinline, aligned(4096))) long ptr_chain(long ptr) {
 
 
 int main(int argc, char **argv) {
+    if (argc > 1) {
+        N= atol(argv[1]);
+    }
     printf("begin add chain\n");
     printf("end add chain trash:%x\n", add_chain(1));
     printf("begin ptr chasing\n");

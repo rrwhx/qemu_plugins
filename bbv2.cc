@@ -36,7 +36,9 @@ static FILE* syscall_file;
 
 uint64_t icount;
 uint64_t bbcount;
-uint64_t unique_trans_id;
+
+// simpoint id can not be zero
+uint64_t unique_trans_id = 1;
 static uint64_t inst_end;
 
 static void plugin_init(const qemu_info_t* info)
