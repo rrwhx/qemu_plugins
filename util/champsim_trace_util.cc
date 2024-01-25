@@ -57,102 +57,6 @@ const char* branch_type(int is_branch) {
     return "NULL";
 };
 
-// void dump_trace(trace_instr_format_t& t) {
-//     const char* taken = "";
-//     if (t.is_branch) {
-//         if (t.branch_taken) {
-//             taken = "taken";
-//         } else {
-//             taken = "not taken";
-//         }
-//     }
-//     fprintf(stderr, "ip:%-11llx %s %s\n", t.ip, taken, branch_type(t.is_branch));
-//     fprintf(stderr, "write register:");
-//     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
-//         if (t.destination_registers[i]) {
-//             fprintf(stderr, "%d ", t.destination_registers[i]);
-//         }
-//     }
-//     fprintf(stderr, "\n");
-
-//     fprintf(stderr, "read  register:");
-//     for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
-//         if (t.source_registers[i]) {
-//             fprintf(stderr, "%d ", t.source_registers[i]);
-//         }
-//     }
-//     fprintf(stderr, "\n");
-
-//     fprintf(stderr, "write memory  :");
-//     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
-//         if (t.destination_memory[i]) {
-//             fprintf(stderr, "%llx ", t.destination_memory[i]);
-//         }
-//     }
-//     fprintf(stderr, "\n");
-
-//     fprintf(stderr, "read  memory  :");
-//     for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
-//         if (t.source_memory[i]) {
-//             fprintf(stderr, "%llx ", t.source_memory[i]);
-//         }
-//     }
-//     fprintf(stderr, "\n");
-//     fprintf(stderr, "\n");
-
-
-// }
-
-// void dump_trace(trace_instr_format_t& t) {
-//     const char* taken = "";
-//     if (t.is_branch) {
-//         if (t.branch_taken) {
-//             taken = "taken";
-//         } else {
-//             taken = "not taken";
-//         }
-//     }
-//     fprintf(stderr, "ip:%-1llx %-10s %-15s", t.ip, taken, branch_type(t.is_branch));
-//     fprintf(stderr, "write register:");
-//     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
-//         if (t.destination_registers[i]) {
-//             fprintf(stderr, "%4d ", t.destination_registers[i]);
-//         } else {
-//             fprintf(stderr, "     ");
-//         }
-//     }
-
-//     fprintf(stderr, "read register:");
-//     for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
-//         if (t.source_registers[i]) {
-//             fprintf(stderr, "%4d ", t.source_registers[i]);
-//         } else {
-//             fprintf(stderr, "     ");
-//         }
-//     }
-
-//     fprintf(stderr, "write memory:");
-//     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
-//         if (t.destination_memory[i]) {
-//             fprintf(stderr, "%llx ", t.destination_memory[i]);
-//         } else {
-//             fprintf(stderr, " ");
-//         }
-//     }
-
-//     fprintf(stderr, "read  memory:");
-//     for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
-//         if (t.source_memory[i]) {
-//             fprintf(stderr, "%llx ", t.source_memory[i]);
-//         } else {
-//             fprintf(stderr, " ");
-//         }
-//     }
-//     fprintf(stderr, "\n");
-
-
-// }
-
 void dump_trace(trace_instr_format_t& t) {
     const char* taken = "";
     if (t.is_branch) {
@@ -204,8 +108,8 @@ void dump_trace(trace_instr_format_t& t) {
 }
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        printf("usage: ./champsim_trace_dump trace_filename\n");
+    if (argc < 3) {
+        printf("usage: ./champsim_trace_dump in_trace_filename out_trace_filename\n");
         exit(0);
     }
     char* trace_filename = argv[1];
@@ -232,9 +136,23 @@ int main(int argc, char** argv) {
     }
     close(trace_fd);
 
-    for (int64_t i = 0; i < trace_count; i++) {
-        dump_trace(trace_buffer[i]);
+    char* out_trace_filename = argv[2];
+    FILE* of = fopen(out_trace_filename, "wb");
+    if (!of) {
+        fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno,
+                strerror(errno), __LINE__);
+        exit(EXIT_FAILURE);
     }
+
+    for (int64_t i = 0; i < trace_count; i++) {
+        // dump_trace(trace_buffer[i]);
+        if (trace_buffer[i].ip == 0) {
+            fprintf(stderr, "index:%ld ip = 0\n", i);
+            exit(EXIT_FAILURE);
+        }
+        fwrite(trace_buffer + i, 64, 1, of);
+    }
+    fclose(of);
 
     return 0;
 }
