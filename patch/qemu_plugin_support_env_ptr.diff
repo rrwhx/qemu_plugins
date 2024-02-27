@@ -1,16 +1,3 @@
-diff --git a/disas/disas.c b/disas/disas.c
-index 0d2d06c2ec..04fc7f1edb 100644
---- a/disas/disas.c
-+++ b/disas/disas.c
-@@ -173,7 +173,7 @@ static void initialize_debug_host(CPUDebug *s)
- #error unsupported RISC-V ABI
- #endif
- #elif defined(__aarch64__)
--    s->info.cap_arch = CS_ARCH_ARM64;
-+    s->info.cap_arch = CS_AARCH64pre(CS_ARCH_);
- #elif defined(__alpha__)
-     s->info.print_insn = print_insn_alpha;
- #elif defined(__sparc__)
 diff --git a/include/qemu/qemu-plugin.h b/include/qemu/qemu-plugin.h
 index 4daab6efd2..e06734af78 100644
 --- a/include/qemu/qemu-plugin.h
@@ -51,16 +38,4 @@ index 71f6c90549..78055fbca0 100644
    qemu_plugin_get_hwaddr;
    qemu_plugin_hwaddr_device_name;
    qemu_plugin_hwaddr_is_io;
-diff --git a/target/arm/cpu.c b/target/arm/cpu.c
-index 650e09b29c..ad93212fbd 100644
---- a/target/arm/cpu.c
-+++ b/target/arm/cpu.c
-@@ -1010,7 +1010,7 @@ static void arm_disas_set_info(CPUState *cpu, disassemble_info *info)
-     bool sctlr_b;
- 
-     if (is_a64(env)) {
--        info->cap_arch = CS_ARCH_ARM64;
-+        info->cap_arch = CS_AARCH64pre(CS_ARCH_);
-         info->cap_insn_unit = 4;
-         info->cap_insn_split = 4;
-     } else {
+
