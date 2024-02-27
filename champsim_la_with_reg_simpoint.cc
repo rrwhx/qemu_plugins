@@ -24,6 +24,8 @@ extern "C" {
 
 #include "loongarch_decode_insns.c.inc"
 
+QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
+
 using namespace std;
 
 #define NUM_INSTR_DESTINATIONS 1
@@ -145,8 +147,8 @@ insn_code insn_code_init(uint64_t pc, const uint8_t* data, int size) {
 map<insn_code, void*> insn_code_data;
 
 // trace_instr_format_t curr_instr;
-
-int64_t REAL_INSN_COUNT;
+// instructions has finished
+int64_t REAL_INSN_COUNT = -1;
 int64_t BB_INTERVAL = 10000;
 int64_t BB_SAVE_NUM;
 const char* trace_filename;
@@ -204,21 +206,21 @@ static void plugin_init(const qemu_info_t* info) {
         qsort(simpoints, simpoints_num, sizeof(simpoints[0]), cmpfunc);
 
         // 1:1 warm up
-        if (simpoints[simpoints_num - 1] == 0) {
-            simpoints[simpoints_num - 1] = 1;
-            if (simpoints_num >=2 && simpoints[simpoints_num - 1] == 1 && simpoints[simpoints_num - 2] == 1) {
-                simpoints_num --;
-            }
-        }
-        for (size_t i = 0; i < simpoints_num; i++) {
-            simpoints[i] --;
-        }
-        for (size_t i = 0; i < simpoints_num - 1; i++) {
-            if (simpoints[i] + 1 == simpoints[i + 1]) {
-                fprintf(stderr, "simpoints overlap, not supportted currently\n");
-                exit(EXIT_FAILURE);
-            }
-        }
+        // if (simpoints[simpoints_num - 1] == 0) {
+        //     simpoints[simpoints_num - 1] = 1;
+        //     if (simpoints_num >=2 && simpoints[simpoints_num - 1] == 1 && simpoints[simpoints_num - 2] == 1) {
+        //         simpoints_num --;
+        //     }
+        // }
+        // for (size_t i = 0; i < simpoints_num; i++) {
+        //     simpoints[i] --;
+        // }
+        // for (size_t i = 0; i < simpoints_num - 1; i++) {
+        //     if (simpoints[i] + 1 == simpoints[i + 1]) {
+        //         fprintf(stderr, "simpoints overlap, not supportted currently\n");
+        //         exit(EXIT_FAILURE);
+        //     }
+        // }
 
         for (size_t i = 0; i < simpoints_num; i++) {
             fprintf(stderr, "%ld ", simpoints[i]);
@@ -317,6 +319,8 @@ void fill_insn_template(trace_instr_format* insn, uint64_t pc,
 }
 int save;
 int saved_inst_num;
+bool has_ibar_begin;
+bool has_ibar_end;
 
 void plugin_exit(qemu_plugin_id_t id, void* p) {
     if (save && saved_inst_num < BB_SAVE_NUM) {
@@ -332,10 +336,28 @@ void plugin_exit(qemu_plugin_id_t id, void* p) {
     fprintf(stderr, "plugin fini, trace fini\n");
 }
 
+static void qemu_dump_guest_reg(const char* filename) {
+#ifdef QEMU_PLUGIN_HAS_ENV_PTR
+    uint64_t* env = (uint64_t*)qemu_plugin_env_ptr();
+    FILE* f = fopen(filename, "w");
+    if (f == NULL) {
+        fprintf(stderr, "unable to open %s, %s\n", filename, strerror(errno));
+        return;
+    }
+    for (int i = 0; i < 32; i++) {
+        fprintf(f, "gpr, %d, %016lx\n", i, env[i]);
+    }
 
+    fclose(f);
+#endif
+}
 
 static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
+    if (!has_ibar_begin) {
+        return;
+    }
     ++ REAL_INSN_COUNT;
+    // fprintf(stderr, "simpoints_num :%ld REAL_INSN_COUNT:%ld BB_INTERVAL:%ld simpoints[simpoints_num - 1]:%ld\n", simpoints_num, REAL_INSN_COUNT, BB_INTERVAL, simpoints[simpoints_num - 1]);
     // 1:1 warmup
     if (save == 0 && simpoints_num > 0 && REAL_INSN_COUNT == (BB_INTERVAL * simpoints[simpoints_num - 1])) {
         fprintf(stderr, "save begin %ld\n", simpoints[simpoints_num - 1]);
@@ -350,12 +372,16 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
     trace_instr_format* p = (trace_instr_format*)userdata;
     if (saved_inst_num) {
         trace_instr_format* p = (trace_instr_format*)userdata;
-        trace_instr_format* t = trace_buffer + saved_inst_num;
+        trace_instr_format* t = trace_buffer + saved_inst_num - 1;
         if (t->ip + t->branch_taken != p->ip) {
             t->branch_taken = 1;
         } else {
             t->branch_taken = 0;
         }
+#ifdef QEMU_PLUGIN_HAS_ENV_PTR
+        uint64_t* env = (uint64_t*)qemu_plugin_env_ptr();
+        t->ret_val = env[t->ret_val];
+#endif
     } else {
         char current_trace_filename[1024];
         sprintf(current_trace_filename, "%s_%ld", trace_filename, REAL_INSN_COUNT);
@@ -379,12 +405,21 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
             exit(EXIT_FAILURE);
         }
         close(trace_fd);
+        sprintf(current_trace_filename, "%s_memory.bin_%ld", trace_filename, REAL_INSN_COUNT);
+        qemu_plugin_dump_memory(current_trace_filename);
+        sprintf(current_trace_filename, "%s_regfile.txt_%ld", trace_filename, REAL_INSN_COUNT);
+        qemu_dump_guest_reg(current_trace_filename);
     }
     trace_buffer[saved_inst_num] = *p;
     if (verbose) {
         printf("cpu:%d, pc:%llx, is_branch:%d\n", vcpu_index, p->ip, p->is_branch);
     }
 
+    if (saved_inst_num == 500) {
+        char current_trace_filename[1024];
+        sprintf(current_trace_filename, "%s_regfile.txt_500_%ld", trace_filename, REAL_INSN_COUNT);
+        qemu_dump_guest_reg(current_trace_filename);
+    }
     saved_inst_num ++;
     if (saved_inst_num == BB_SAVE_NUM) {
         msync(trace_buffer, filesize, MS_SYNC);
@@ -396,6 +431,9 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
 
 static void vcpu_mem_access(unsigned int vcpu_index, qemu_plugin_meminfo_t info,
                             uint64_t vaddr, void* userdata) {
+    if (!has_ibar_begin) {
+        return;
+    }
     if (!save) {
         return;
     }
@@ -419,7 +457,6 @@ static void vcpu_mem_access(unsigned int vcpu_index, qemu_plugin_meminfo_t info,
         if (verbose) {
             printf("cpu:%d, pc:%p, mem_addr:%lx, size:%d, is_st:%d\n", vcpu_index,
                     userdata, vaddr, 1 << qemu_plugin_mem_size_shift(info), is_st);
-
         }
 }
 
@@ -439,6 +476,16 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb* tb) {
             memset(insn_template, 0, sizeof(trace_instr_format));
             fill_insn_template(insn_template, addr, data, size);
             insn_code_data[ic] = insn_template;
+        }
+
+        if (*(uint32_t*)data == 0x38728040) {
+            fprintf(stderr, "ibar begin\n");
+            has_ibar_begin = 1;
+        }
+        if (*(uint32_t*)data == 0x38728041) {
+            fprintf(stderr, "ibar end\n");
+            has_ibar_end = 1;
+            exit(0);
         }
 
         qemu_plugin_register_vcpu_insn_exec_cb(insn, vcpu_insn_exec,
