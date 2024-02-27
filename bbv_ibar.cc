@@ -132,9 +132,6 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
             exit(0);
         }
     }
-    if (!has_ibar_begin) {
-        return;
-    }
     udata = (void*)&(pc_id_count[pc].count);
     qemu_plugin_register_vcpu_tb_exec_inline(tb, QEMU_PLUGIN_INLINE_ADD_U64, &icount, insns);
     qemu_plugin_register_vcpu_tb_exec_cb(tb, tb_exec, QEMU_PLUGIN_CB_NO_REGS, udata);
