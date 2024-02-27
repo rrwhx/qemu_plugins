@@ -1,0 +1,131 @@
+diff --git a/include/qemu/qemu-plugin.h b/include/qemu/qemu-plugin.h
+index e06734af78..28c7b707c3 100644
+--- a/include/qemu/qemu-plugin.h
++++ b/include/qemu/qemu-plugin.h
+@@ -713,4 +713,9 @@ uint64_t qemu_plugin_entry_code(void);
+ QEMU_PLUGIN_API
+ void* qemu_plugin_env_ptr(void);
+ 
++#define QEMU_PLUGIN_HAS_DUMP_MEMORY
++
++QEMU_PLUGIN_API
++void* qemu_plugin_dump_memory(const char* filename);
++
+ #endif /* QEMU_QEMU_PLUGIN_H */
+diff --git a/linux-user/elfload.c b/linux-user/elfload.c
+index 842e2c7454..9f65ef32a0 100644
+--- a/linux-user/elfload.c
++++ b/linux-user/elfload.c
+@@ -4801,8 +4801,70 @@ static int elf_core_dump(int signr, const CPUArchState *env)
+         return (-errno);
+     return (0);
+ }
++void qemu_dump_guest_memory(const char* filename) {
++    struct vm_area_struct *vma = NULL;
++    struct mm_struct *mm = NULL;
++    FILE* f = NULL;
++    if ((mm = vma_init()) == NULL) {
++        fprintf(stderr, "vma_init fail\n");
++        goto out;
++    }
++    walk_memory_regions(mm, vma_walker);
++    f = fopen(filename, "wb");
++    if (f == NULL) {
++        fprintf(stderr, "unable to open %s, %s\n", filename, strerror(errno));
++        goto out;
++    }
++
++    for (vma = vma_first(mm); vma != NULL; vma = vma_next(vma)) {
++        abi_ulong addr = vma->vma_start;
++        fprintf(stderr, "vma start:" TARGET_FMT_lx " end:" TARGET_FMT_lx "\n", vma->vma_start, vma->vma_end);
++
++        for (addr = vma->vma_start; addr < vma->vma_end;
++             addr += TARGET_PAGE_SIZE) {
++            char page[TARGET_PAGE_SIZE];
++            int error;
++
++            /*
++             *  Read in page from target process memory and
++             *  write it to coredump file.
++             */
++            error = copy_from_user(page, addr, sizeof (page));
++            if (error != 0) {
++                (void) fprintf(stderr, "unable to dump " TARGET_ABI_FMT_lx "\n",
++                               addr);
++                // errno = -error;
++                // goto out;
++                continue;
++            }
++            uint64_t begin_size[8] = {0};
++            begin_size[0] = addr;
++            begin_size[1] = TARGET_PAGE_SIZE;
++            if(fwrite(begin_size, sizeof(begin_size), 1, f) != 1) {
++                fprintf(stderr, "unable to write %s, %s\n", filename, strerror(errno));
++                goto out;
++            }
++            if(fwrite(page, TARGET_PAGE_SIZE, 1, f) != 1) {
++                fprintf(stderr, "unable to write %s, %s\n", filename, strerror(errno));
++                goto out;
++            }
++        }
++    }
++ out:
++    if (mm != NULL)
++        vma_delete(mm);
++    if (f != NULL)
++        fclose(f);
++}
+ #endif /* USE_ELF_CORE_DUMP */
+ 
++#ifndef USE_ELF_CORE_DUMP
++void qemu_dump_guest_memory(const char* filename) {
++    return;
++}
++#endif
++
++
+ void do_init_thread(struct target_pt_regs *regs, struct image_info *infop)
+ {
+     init_thread(regs, infop);
+diff --git a/linux-user/loader.h b/linux-user/loader.h
+index e102e6f410..bf47b7a3f6 100644
+--- a/linux-user/loader.h
++++ b/linux-user/loader.h
+@@ -107,4 +107,5 @@ uint64_t get_elf_hwcap2(void);
+ const char *elf_hwcap2_str(uint32_t bit);
+ #endif
+ 
++void qemu_dump_guest_memory(const char* filename);
+ #endif /* LINUX_USER_LOADER_H */
+diff --git a/plugins/api.c b/plugins/api.c
+index 7dc42bf0b8..99834566a6 100644
+--- a/plugins/api.c
++++ b/plugins/api.c
+@@ -431,4 +431,14 @@ uint64_t qemu_plugin_entry_code(void)
+ QEMU_PLUGIN_API
+ void* qemu_plugin_env_ptr(void) {
+     return cpu_env(current_cpu);
++}
++
++#define QEMU_PLUGIN_HAS_DUMP_MEMORY
++
++QEMU_PLUGIN_API
++void* qemu_plugin_dump_memory(const char* filename) {
++#ifdef CONFIG_USER_ONLY
++    qemu_dump_guest_memory(filename);
++#endif
++    return NULL;
+ }
+\ No newline at end of file
+diff --git a/plugins/qemu-plugins.symbols b/plugins/qemu-plugins.symbols
+index 78055fbca0..8ee2ef88a8 100644
+--- a/plugins/qemu-plugins.symbols
++++ b/plugins/qemu-plugins.symbols
+@@ -3,6 +3,7 @@
+   qemu_plugin_end_code;
+   qemu_plugin_entry_code;
+   qemu_plugin_env_ptr;
++  qemu_plugin_dump_memory;
+   qemu_plugin_get_hwaddr;
+   qemu_plugin_hwaddr_device_name;
+   qemu_plugin_hwaddr_is_io;
