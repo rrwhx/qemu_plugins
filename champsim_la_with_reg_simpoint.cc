@@ -156,6 +156,7 @@ int trace_fd;
 uint64_t filesize;
 trace_instr_format_t* trace_buffer;
 // int64_t trace_buffer_index = -1;
+char current_trace_filename[1024];
 
 
 bool verbose;
@@ -232,7 +233,9 @@ static void plugin_init(const qemu_info_t* info) {
     if (BB_INTERVAL_ENV) {
         BB_INTERVAL = atoll(BB_INTERVAL_ENV);
         // 1:1 warmup
-        BB_SAVE_NUM = BB_INTERVAL * 2;
+        // BB_SAVE_NUM = BB_INTERVAL * 2;
+        // none warm up
+        BB_SAVE_NUM = BB_INTERVAL;
     }
 
     trace_filename = getenv("TRACE_FILENAME");
@@ -326,12 +329,16 @@ void plugin_exit(qemu_plugin_id_t id, void* p) {
     if (save && saved_inst_num < BB_SAVE_NUM) {
         msync(trace_buffer, filesize, MS_SYNC);
         munmap(trace_buffer, filesize);
-        int r = truncate(trace_filename, min((uint64_t)saved_inst_num, (uint64_t)BB_SAVE_NUM) *
+        int r = truncate(current_trace_filename, min((uint64_t)saved_inst_num, (uint64_t)BB_SAVE_NUM) *
                                     sizeof(trace_instr_format_t));
         if (r < 0) {
             fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno,
                 strerror(errno), __LINE__);
+        } else {
+            fprintf(stderr, "truncate %s to %ld * %zu\n", current_trace_filename, min((uint64_t)saved_inst_num, (uint64_t)BB_SAVE_NUM) ,
+                                    sizeof(trace_instr_format_t));
         }
+
     }
     fprintf(stderr, "plugin fini, trace fini\n");
 }
@@ -383,9 +390,9 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
         t->ret_val = env[t->ret_val];
 #endif
     } else {
-        char current_trace_filename[1024];
-        sprintf(current_trace_filename, "%s_%ld", trace_filename, REAL_INSN_COUNT);
-        trace_fd = open(current_trace_filename, O_RDWR | O_CREAT, (mode_t)0600);
+        char filename_buffer[1024];
+        sprintf(filename_buffer, "%s_%ld", trace_filename, REAL_INSN_COUNT);
+        trace_fd = open(filename_buffer, O_RDWR | O_CREAT, (mode_t)0600);
         if (trace_fd < 0) {
             fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno, strerror(errno), __LINE__);
             exit(EXIT_FAILURE);
@@ -405,10 +412,11 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
             exit(EXIT_FAILURE);
         }
         close(trace_fd);
-        sprintf(current_trace_filename, "%s_memory.bin_%ld", trace_filename, REAL_INSN_COUNT);
-        qemu_plugin_dump_memory(current_trace_filename);
-        sprintf(current_trace_filename, "%s_regfile.txt_%ld", trace_filename, REAL_INSN_COUNT);
-        qemu_dump_guest_reg(current_trace_filename);
+        strcpy(current_trace_filename, filename_buffer);
+        sprintf(filename_buffer, "%s_memory.bin_%ld", trace_filename, REAL_INSN_COUNT);
+        qemu_plugin_dump_memory(filename_buffer);
+        sprintf(filename_buffer, "%s_regfile.txt_%ld", trace_filename, REAL_INSN_COUNT);
+        qemu_dump_guest_reg(filename_buffer);
     }
     trace_buffer[saved_inst_num] = *p;
     if (verbose) {
@@ -416,9 +424,9 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
     }
 
     if (saved_inst_num == 500) {
-        char current_trace_filename[1024];
-        sprintf(current_trace_filename, "%s_regfile.txt_500_%ld", trace_filename, REAL_INSN_COUNT);
-        qemu_dump_guest_reg(current_trace_filename);
+        char filename_buffer[1024];
+        sprintf(filename_buffer, "%s_regfile.txt_500_%ld", trace_filename, REAL_INSN_COUNT);
+        qemu_dump_guest_reg(filename_buffer);
     }
     saved_inst_num ++;
     if (saved_inst_num == BB_SAVE_NUM) {
