@@ -391,7 +391,7 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
 #endif
     } else {
         char filename_buffer[1024];
-        sprintf(filename_buffer, "%s_%ld", trace_filename, REAL_INSN_COUNT);
+        sprintf(filename_buffer, "%s_%ld.champsim.trace", trace_filename, REAL_INSN_COUNT);
         trace_fd = open(filename_buffer, O_RDWR | O_CREAT, (mode_t)0600);
         if (trace_fd < 0) {
             fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno, strerror(errno), __LINE__);
@@ -413,9 +413,9 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
         }
         close(trace_fd);
         strcpy(current_trace_filename, filename_buffer);
-        sprintf(filename_buffer, "%s_memory.bin_%ld", trace_filename, REAL_INSN_COUNT);
+        sprintf(filename_buffer, "%s_%ld.memory.bin", trace_filename, REAL_INSN_COUNT);
         qemu_plugin_dump_memory(filename_buffer);
-        sprintf(filename_buffer, "%s_regfile.txt_%ld", trace_filename, REAL_INSN_COUNT);
+        sprintf(filename_buffer, "%s_%ld.regfile.txt", trace_filename, REAL_INSN_COUNT);
         qemu_dump_guest_reg(filename_buffer);
     }
     trace_buffer[saved_inst_num] = *p;
@@ -425,7 +425,7 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
 
     if (saved_inst_num == 500) {
         char filename_buffer[1024];
-        sprintf(filename_buffer, "%s_regfile.txt_500_%ld", trace_filename, REAL_INSN_COUNT);
+        sprintf(filename_buffer, "%s_%ld.regfile500.txt", trace_filename, REAL_INSN_COUNT - 500);
         qemu_dump_guest_reg(filename_buffer);
     }
     saved_inst_num ++;
