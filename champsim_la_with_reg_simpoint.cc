@@ -301,16 +301,21 @@ void fill_insn_template(trace_instr_format* insn, uint64_t pc,
     // fprintf(stderr, "%s\n", buf);
     insn->is_branch = la_inst_branch_type(la_decode);
     insn->ret_val = 0;
-    if (la_inst_is_branch_not_link(la_decode.id) || la_inst_is_st(la_decode.id)) {
+    if (la_decode.id == LA_INST_BL) {
+#ifdef QEMU_PLUGIN_HAS_ENV_PTR
+        insn->ret_val = 1;
+#endif
+        insn->destination_registers[0] = 1;
+    } else if (la_inst_is_branch_not_link(la_decode.id) || la_inst_is_st(la_decode.id)) {
         for (int i = 0; i < min(la_decode.opcnt, NUM_INSTR_SOURCES); i++) {
             insn->source_registers[i] = encode_reg(la_decode.op[i]);
         }
     } else {
-        if (la_decode.opcnt >= 1 && la_decode.op[0].type == LA_OP_GPR) {
 #ifdef QEMU_PLUGIN_HAS_ENV_PTR
+        if (la_decode.opcnt >= 1 && la_decode.op[0].type == LA_OP_GPR) {
             insn->ret_val = la_decode.op[0].val;
-#endif
         }
+#endif
         if (la_decode.opcnt >= 1) {
             insn->destination_registers[0] = encode_reg(la_decode.op[0]);
         }
