@@ -480,6 +480,7 @@ typedef struct trace_instr_format {
 
     unsigned long long int destination_memory[NUM_INSTR_DESTINATIONS]; // output memory
     unsigned long long int source_memory[NUM_INSTR_SOURCES];           // input memory
+    uint32_t inst;
 } trace_instr_format_t;
 
 
@@ -745,7 +746,8 @@ static void plugin_init(const qemu_info_t* info) {
 void fill_insn_template(trace_instr_format* insn, uint64_t pc,
                         const uint8_t* data, int size) {
     insn->ip = pc;
-    insn->branch_taken = size;
+    insn->branch_taken = size;\
+    insn->inst = *(uint32_t*)data;
 
     cs_insn *cs_insn;
     size_t count = cs_disasm(cs_handle, (const uint8_t*)data, size, pc, 1, &cs_insn);

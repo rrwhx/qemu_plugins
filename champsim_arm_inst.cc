@@ -70,8 +70,8 @@ enum inst_cat {
 };
 
 
-typedef __int128 insn_code;
-// typedef uint64_t insn_code;
+// typedef __int128 insn_code;
+typedef uint64_t insn_code;
 
 insn_code insn_code_init(uint64_t pc, const uint8_t* data, int size) {
     // insn_code r = 0;
@@ -81,8 +81,7 @@ insn_code insn_code_init(uint64_t pc, const uint8_t* data, int size) {
     //     r |= data[i];
     // }
     // return r;
-    uint32_t ins = *(uint32_t*)data;
-    return pc | (__int128)ins << 64;
+    return pc;
 }
 
 map<insn_code, void*> insn_code_data;
@@ -227,6 +226,28 @@ static void plugin_init(const qemu_info_t* info) {
         trace_filename = "champsim.trace";
     }
     filesize = TRACE_COUNT * sizeof(trace_instr_format_t);
+    trace_fd = open(trace_filename, O_RDWR | O_CREAT, (mode_t)0600);
+    if (trace_fd < 0) {
+        fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno,
+                strerror(errno), __LINE__);
+        exit(EXIT_FAILURE);
+    }
+    int r = ftruncate(trace_fd, TRACE_COUNT * sizeof(trace_instr_format_t));
+    if (r < 0) {
+        fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno,
+                strerror(errno), __LINE__);
+        exit(EXIT_FAILURE);
+    }
+
+    trace_buffer = (trace_instr_format_t*)mmap(
+        0, filesize, PROT_READ | PROT_WRITE, MAP_SHARED, trace_fd, 0);
+
+    if (trace_buffer == MAP_FAILED) {
+        fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno,
+                strerror(errno), __LINE__);
+        exit(EXIT_FAILURE);
+    }
+    close(trace_fd);
 
     // printf("%s\n", info->target_name);
     cs_err err;
@@ -244,32 +265,6 @@ static void plugin_init(const qemu_info_t* info) {
         }
     }
     cs_option(cs_handle, CS_OPT_DETAIL, CS_OPT_ON);
-}
-
-void init_tracefile(int trace_id) {
-    char filename[1024];
-    sprintf(filename, "%s_%d", trace_filename, trace_id);
-    trace_fd = open(filename, O_RDWR | O_CREAT, (mode_t)0600);
-    if (trace_fd < 0) {
-        fprintf(stderr, "can not open %s errno=%d, err_msg=\"%s\", line:%d\n", filename, errno, strerror(errno), __LINE__);
-        exit(EXIT_FAILURE);
-    }
-    int r = ftruncate(trace_fd, TRACE_COUNT * sizeof(trace_instr_format_t));
-    if (r < 0) {
-        fprintf(stderr, "can not ftruncate %s errno=%d, err_msg=\"%s\", line:%d\n", filename, errno, strerror(errno), __LINE__);
-        exit(EXIT_FAILURE);
-    }
-
-    trace_buffer = (trace_instr_format_t*)mmap(
-        0, filesize, PROT_READ | PROT_WRITE, MAP_SHARED, trace_fd, 0);
-
-    if (trace_buffer == MAP_FAILED) {
-        fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno, strerror(errno), __LINE__);
-        exit(EXIT_FAILURE);
-    }
-    close(trace_fd);
-    switch_on = 1;
-    trace_buffer_index = -1;
 }
 
 void fill_insn_template(trace_instr_format* insn, uint64_t pc,
@@ -405,8 +400,6 @@ static void vcpu_mem_access(unsigned int vcpu_index, qemu_plugin_meminfo_t info,
     }
 }
 
-static int trace_id;
-
 static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb* tb) {
     size_t insns = qemu_plugin_tb_n_insns(tb);
 
@@ -416,8 +409,7 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb* tb) {
         const uint8_t* data = (uint8_t*)qemu_plugin_insn_data(insn);
         if (*(uint32_t*)data == 0x2200) {
             fprintf(stderr, "-----------CHAMPSIM TRACE BEGIN-----------\n");
-            init_tracefile(trace_id);
-            trace_id ++;
+            switch_on = 1;
         }
         int size = qemu_plugin_insn_size(insn);
         insn_code ic = insn_code_init(addr, data, size);

@@ -27,6 +27,7 @@ extern "C" {
 }
 
 
+
 #define NUM_INSTR_DESTINATIONS 2
 #define NUM_INSTR_SOURCES 4
 
@@ -70,8 +71,8 @@ enum inst_cat {
 };
 
 
-typedef __int128 insn_code;
-// typedef uint64_t insn_code;
+// typedef __int128 insn_code;
+typedef uint64_t insn_code;
 
 insn_code insn_code_init(uint64_t pc, const uint8_t* data, int size) {
     // insn_code r = 0;
@@ -81,8 +82,7 @@ insn_code insn_code_init(uint64_t pc, const uint8_t* data, int size) {
     //     r |= data[i];
     // }
     // return r;
-    uint32_t ins = *(uint32_t*)data;
-    return pc | (__int128)ins << 64;
+    return pc;
 }
 
 map<insn_code, void*> insn_code_data;
@@ -90,13 +90,13 @@ map<insn_code, void*> insn_code_data;
 // trace_instr_format_t curr_instr;
 
 int64_t REAL_INSN_COUNT;
-int64_t TRACE_COUNT = 10000;
-bool switch_on;
+int64_t BB_INTERVAL = 10000;
+int64_t BB_SAVE_NUM;
 const char* trace_filename;
 int trace_fd;
 uint64_t filesize;
 trace_instr_format_t* trace_buffer;
-int64_t trace_buffer_index = -1;
+// int64_t trace_buffer_index = -1;
 
 // branch types
 enum branch_type {
@@ -208,6 +208,28 @@ target_info all_archs[] = {
 target_info* target;
 bool verbose;
 bool early_exit;
+
+
+#define MAX_SIMPOINTS_NUM 1024
+int64_t simpoints[MAX_SIMPOINTS_NUM];
+size_t simpoints_num;
+
+long long SM_INTERVAL = 1000000;
+
+static inline FILE* fopen_nofail(const char *__restrict __filename, const char *__restrict __modes) {
+    FILE* f = fopen(__filename, __modes);
+    if (!f) {
+        perror(__filename);
+        abort();
+    }
+    return f;
+}
+
+static int cmpfunc (const void * a, const void * b) {
+    // reverse
+   return ( *(uint64_t*)b - *(uint64_t*)a );
+}
+
 static void plugin_init(const qemu_info_t* info) {
     fprintf(stderr, "sizeof(trace_instr_format):%zu\n",
             sizeof(trace_instr_format));
@@ -217,18 +239,57 @@ static void plugin_init(const qemu_info_t* info) {
     if (getenv("EARLY_EXIT")) {
         early_exit = true;
     }
-    const char* TRACE_COUNT_ENV = getenv("TRACE_COUNT");
-    if (TRACE_COUNT_ENV) {
-        TRACE_COUNT = atoll(TRACE_COUNT_ENV);
+
+    const char* SIMPOINT_FILE_ENV = getenv("SIMPOINT_FILE");
+    if (SIMPOINT_FILE_ENV) {
+        FILE* f = fopen_nofail(SIMPOINT_FILE_ENV, "r");
+        while (fscanf(f, "%ld%*f", simpoints + simpoints_num) == 1) {
+            ++ simpoints_num;
+            if (simpoints_num >= MAX_SIMPOINTS_NUM) {
+                fprintf(stderr, "simpoints too large\n");
+                exit(1);
+            }
+        }
+        fclose(f);
+        qsort(simpoints, simpoints_num, sizeof(simpoints[0]), cmpfunc);
+
+        // 1:1 warm up
+        if (simpoints[simpoints_num - 1] == 0) {
+            simpoints[simpoints_num - 1] = 1;
+            if (simpoints_num >=2 && simpoints[simpoints_num - 1] == 1 && simpoints[simpoints_num - 2] == 1) {
+                simpoints_num --;
+            }
+        }
+        for (size_t i = 0; i < simpoints_num; i++) {
+            simpoints[i] --;
+        }
+        for (size_t i = 0; i < simpoints_num - 1; i++) {
+            if (simpoints[i] + 1 == simpoints[i + 1]) {
+                fprintf(stderr, "simpoints overlap, not supportted currently\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        for (size_t i = 0; i < simpoints_num; i++) {
+            fprintf(stderr, "%ld ", simpoints[i]);
+        }
+        fprintf(stderr, "\n");
+    }
+
+    const char* BB_INTERVAL_ENV = getenv("BB_INTERVAL");
+    if (BB_INTERVAL_ENV) {
+        BB_INTERVAL = atoll(BB_INTERVAL_ENV);
+        // 1:1 warmup
+        BB_SAVE_NUM = BB_INTERVAL * 2;
     }
 
     trace_filename = getenv("TRACE_FILENAME");
     if (!trace_filename) {
         trace_filename = "champsim.trace";
     }
-    filesize = TRACE_COUNT * sizeof(trace_instr_format_t);
+    filesize = BB_SAVE_NUM * sizeof(trace_instr_format_t);
 
-    // printf("%s\n", info->target_name);
+    printf("%s\n", info->target_name);
     cs_err err;
     for (int i = 0; all_archs[i].name; i++) {
         if (!strcmp(all_archs[i].name, info->target_name)) {
@@ -246,36 +307,10 @@ static void plugin_init(const qemu_info_t* info) {
     cs_option(cs_handle, CS_OPT_DETAIL, CS_OPT_ON);
 }
 
-void init_tracefile(int trace_id) {
-    char filename[1024];
-    sprintf(filename, "%s_%d", trace_filename, trace_id);
-    trace_fd = open(filename, O_RDWR | O_CREAT, (mode_t)0600);
-    if (trace_fd < 0) {
-        fprintf(stderr, "can not open %s errno=%d, err_msg=\"%s\", line:%d\n", filename, errno, strerror(errno), __LINE__);
-        exit(EXIT_FAILURE);
-    }
-    int r = ftruncate(trace_fd, TRACE_COUNT * sizeof(trace_instr_format_t));
-    if (r < 0) {
-        fprintf(stderr, "can not ftruncate %s errno=%d, err_msg=\"%s\", line:%d\n", filename, errno, strerror(errno), __LINE__);
-        exit(EXIT_FAILURE);
-    }
-
-    trace_buffer = (trace_instr_format_t*)mmap(
-        0, filesize, PROT_READ | PROT_WRITE, MAP_SHARED, trace_fd, 0);
-
-    if (trace_buffer == MAP_FAILED) {
-        fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno, strerror(errno), __LINE__);
-        exit(EXIT_FAILURE);
-    }
-    close(trace_fd);
-    switch_on = 1;
-    trace_buffer_index = -1;
-}
-
 void fill_insn_template(trace_instr_format* insn, uint64_t pc,
                         const uint8_t* data, int size) {
     insn->ip = pc;
-    insn->branch_taken = size;
+    insn->branch_taken = size;\
     insn->inst = *(uint32_t*)data;
 
     cs_insn *cs_insn;
@@ -326,13 +361,15 @@ void fill_insn_template(trace_instr_format* insn, uint64_t pc,
 
 
 }
+int save;
+int saved_inst_num;
 
 void plugin_exit(qemu_plugin_id_t id, void* p) {
     cs_close(&cs_handle);
-    if (trace_buffer_index < TRACE_COUNT) {
+    if (save && saved_inst_num < BB_SAVE_NUM) {
         msync(trace_buffer, filesize, MS_SYNC);
         munmap(trace_buffer, filesize);
-        int r = truncate(trace_filename, min((uint64_t)trace_buffer_index, (uint64_t)TRACE_COUNT) *
+        int r = truncate(trace_filename, min((uint64_t)saved_inst_num, (uint64_t)BB_SAVE_NUM) *
                                     sizeof(trace_instr_format_t));
         if (r < 0) {
             fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno,
@@ -342,46 +379,75 @@ void plugin_exit(qemu_plugin_id_t id, void* p) {
     fprintf(stderr, "plugin fini, trace fini\n");
 }
 
+
+
 static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
     ++ REAL_INSN_COUNT;
-    if (!switch_on) {
+    // 1:1 warmup
+    if (save == 0 && simpoints_num > 0 && REAL_INSN_COUNT == (BB_INTERVAL * simpoints[simpoints_num - 1])) {
+        fprintf(stderr, "save begin %ld\n", simpoints[simpoints_num - 1]);
+        simpoints_num --;
+        save = 1;
+        saved_inst_num = 0;
+    }
+
+    if (save == 0) {
         return;
     }
     trace_instr_format* p = (trace_instr_format*)userdata;
-    if (trace_buffer_index >= 0 && trace_buffer_index < TRACE_COUNT) {
-        trace_instr_format* t = trace_buffer + trace_buffer_index;
+    if (saved_inst_num) {
+        trace_instr_format* p = (trace_instr_format*)userdata;
+        trace_instr_format* t = trace_buffer + saved_inst_num - 1;
         if (t->ip + t->branch_taken != p->ip) {
             t->branch_taken = 1;
         } else {
             t->branch_taken = 0;
         }
-        // fprintf(stderr, "cpu:%d, las_pc:%lx, size:%d, curr_pc:%lx, branch_taken:%d\n", vcpu_index, t->ip , t->branch_taken , p->ip, t->branch_taken);
+    } else {
+        char current_trace_filename[1024];
+        sprintf(current_trace_filename, "%s_%ld", trace_filename, REAL_INSN_COUNT);
+        trace_fd = open(current_trace_filename, O_RDWR | O_CREAT, (mode_t)0600);
+        if (trace_fd < 0) {
+            fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno, strerror(errno), __LINE__);
+            exit(EXIT_FAILURE);
+        }
+        int r = ftruncate(trace_fd, BB_SAVE_NUM * sizeof(trace_instr_format_t));
+        if (r < 0) {
+            fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno, strerror(errno), __LINE__);
+            exit(EXIT_FAILURE);
+        }
+
+        trace_buffer = (trace_instr_format_t*)mmap(
+            0, filesize, PROT_READ | PROT_WRITE, MAP_SHARED, trace_fd, 0);
+
+        if (trace_buffer == MAP_FAILED) {
+            fprintf(stderr, "errno=%d, err_msg=\"%s\", line:%d\n", errno,
+                    strerror(errno), __LINE__);
+            exit(EXIT_FAILURE);
+        }
+        close(trace_fd);
     }
-    ++ trace_buffer_index;
-    if (trace_buffer_index == TRACE_COUNT) {
+    trace_buffer[saved_inst_num] = *p;
+    if (verbose) {
+        printf("cpu:%d, pc:%llx, is_branch:%d\n", vcpu_index, p->ip, p->is_branch);
+    }
+
+    saved_inst_num ++;
+    if (saved_inst_num == BB_SAVE_NUM) {
         msync(trace_buffer, filesize, MS_SYNC);
         munmap(trace_buffer, filesize);
-        switch_on = 0;
         fprintf(stderr, "trace fini\n");
-        if (early_exit) {
-            exit(0);
-        }
-    } else if (trace_buffer_index < TRACE_COUNT) {
-        trace_buffer[trace_buffer_index] = *p;
-        if (verbose) {
-            printf("cpu:%d, pc:%llx, is_branch:%d\n", vcpu_index, p->ip, p->is_branch);
-        }
+        save = 0;
     }
 }
 
 static void vcpu_mem_access(unsigned int vcpu_index, qemu_plugin_meminfo_t info,
                             uint64_t vaddr, void* userdata) {
-    if (!switch_on) {
+    if (!save) {
         return;
     }
-    trace_instr_format_t* p = trace_buffer + trace_buffer_index;
+    trace_instr_format_t* p = trace_buffer + saved_inst_num - 1;
     bool is_st = qemu_plugin_mem_is_store(info);
-    if (trace_buffer_index < TRACE_COUNT) {
         if (is_st) {
             for (size_t i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
                 if (p->destination_memory[i] == 0) {
@@ -402,10 +468,7 @@ static void vcpu_mem_access(unsigned int vcpu_index, qemu_plugin_meminfo_t info,
                     userdata, vaddr, 1 << qemu_plugin_mem_size_shift(info), is_st);
 
         }
-    }
 }
-
-static int trace_id;
 
 static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb* tb) {
     size_t insns = qemu_plugin_tb_n_insns(tb);
@@ -414,11 +477,6 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb* tb) {
         struct qemu_plugin_insn* insn = qemu_plugin_tb_get_insn(tb, i);
         uint64_t addr = qemu_plugin_insn_vaddr(insn);
         const uint8_t* data = (uint8_t*)qemu_plugin_insn_data(insn);
-        if (*(uint32_t*)data == 0x2200) {
-            fprintf(stderr, "-----------CHAMPSIM TRACE BEGIN-----------\n");
-            init_tracefile(trace_id);
-            trace_id ++;
-        }
         int size = qemu_plugin_insn_size(insn);
         insn_code ic = insn_code_init(addr, data, size);
         if (insn_code_data.count(ic) == 0) {
