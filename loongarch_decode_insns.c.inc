@@ -2531,7 +2531,7 @@ static int handle_arg_vvvv(LA_DECODE* la_decode, arg_vvvv* a, int id) {
     return true;
 }
 
-static bool la_inst_is_ist(int id) {
+__attribute__((unused)) static bool la_inst_is_ist(int id) {
     switch (id) {
         case LA_INST_ST_B:
         case LA_INST_ST_H:
@@ -2558,7 +2558,7 @@ static bool la_inst_is_ist(int id) {
     return false;
 }
 
-static bool la_inst_is_fst(int id) {
+__attribute__((unused)) static bool la_inst_is_fst(int id) {
     switch (id) {
         case LA_INST_FST_S:
         case LA_INST_FST_D:
@@ -2587,11 +2587,11 @@ static bool la_inst_is_fst(int id) {
     return false;
 }
 
-static bool la_inst_is_st(int id) {
+__attribute__((unused)) static bool la_inst_is_st(int id) {
     return la_inst_is_ist(id) || la_inst_is_fst(id);
 }
 
-static bool la_inst_is_ild(int id) {
+__attribute__((unused)) static bool la_inst_is_ild(int id) {
     switch (id) {
         case LA_INST_LD_B:
         case LA_INST_LD_H:
@@ -2624,7 +2624,7 @@ static bool la_inst_is_ild(int id) {
     return false;
 }
 
-static bool la_inst_is_fld(int id) {
+__attribute__((unused)) static bool la_inst_is_fld(int id) {
     switch (id) {
         case LA_INST_FLD_S:
         case LA_INST_FLD_D:
@@ -2657,11 +2657,11 @@ static bool la_inst_is_fld(int id) {
 
 
 
-static bool la_inst_is_ld(int id) {
+__attribute__((unused)) static bool la_inst_is_ld(int id) {
     return la_inst_is_ild(id) || la_inst_is_fld(id);
 }
 
-static bool la_inst_is_branch(int id) {
+__attribute__((unused)) static bool la_inst_is_branch(int id) {
     switch (id) {
         case LA_INST_BCEQZ:
         case LA_INST_BCNEZ:
@@ -2683,7 +2683,7 @@ static bool la_inst_is_branch(int id) {
     return false;
 }
 
-static bool la_inst_is_branch_not_link(int id) {
+__attribute__((unused)) static bool la_inst_is_branch_not_link(int id) {
     switch (id) {
         case LA_INST_BCEQZ:
         case LA_INST_BCNEZ:
@@ -2703,7 +2703,7 @@ static bool la_inst_is_branch_not_link(int id) {
     return false;
 }
 
-static bool la_inst_str(LA_DECODE *la_decode, char* dst) {
+__attribute__((unused)) static bool la_inst_str(LA_DECODE *la_decode, char* dst) {
     sprintf(dst, "%-12s", la_op_name[la_decode->id]);
     char buf[1024];
     for (int i = 0; i < la_decode->opcnt; i ++) {
