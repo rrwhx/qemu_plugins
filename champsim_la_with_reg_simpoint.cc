@@ -419,7 +419,9 @@ static void vcpu_insn_exec(unsigned int vcpu_index, void* userdata) {
         close(trace_fd);
         strcpy(current_trace_filename, filename_buffer);
         sprintf(filename_buffer, "%s_%ld.memory.bin", trace_filename, REAL_INSN_COUNT);
+#ifdef QEMU_PLUGIN_HAS_DUMP_MEMORY
         qemu_plugin_dump_memory(filename_buffer);
+#endif
         sprintf(filename_buffer, "%s_%ld.regfile.txt", trace_filename, REAL_INSN_COUNT);
         qemu_dump_guest_reg(filename_buffer);
     }
