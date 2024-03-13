@@ -113,6 +113,10 @@ static unsigned long strtoul_suffix(const char *__restrict __nptr,
     return val;
 }
 
+long atol_suffix(const char *nptr) {
+    return strtoul_suffix(nptr, NULL, 0);
+}
+
 uint64_t plugin_args_get_u64_or_else(int argc, char **argv, const char* key, uint64_t default_value){
     char* p = plugin_args_get(argc, argv, key);
     if (p) {
