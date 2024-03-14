@@ -41,8 +41,12 @@ uint64_t bbcount;
 uint64_t unique_trans_id = 1;
 static uint64_t inst_end;
 
+bool is_loongarch;
 static void plugin_init(const qemu_info_t* info)
 {
+    if (strcmp(info->target_name, "loongarch64") == 0){
+        is_loongarch = true;
+    }
     mkdir(bench_name.c_str(), 0777);
     bbv_file = fopen_nofail((bench_name + "/bbv").c_str(), "w");
     pc_info_file = fopen_nofail((bench_name + "/pc_info.txt").c_str(), "w");
@@ -118,18 +122,22 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
         fprintf(pc_info_file, "id:%ld, pc:%lx, bb_insn_num:%ld\n", t.id, pc, t.bbicount);
     }
     for (size_t i = 0; i < insns; i++) {
-        struct qemu_plugin_insn* insn = qemu_plugin_tb_get_insn(tb, i);
-        const uint32_t* data = (uint32_t*)qemu_plugin_insn_data(insn);
         // ibar begin
-        if (*data == 0x38728040) {
-            fprintf(stderr, "ibar begin\n");
-            has_ibar_begin = 1;
-            icount = 0;
-        }
-        if (*data == 0x38728041) {
-            fprintf(stderr, "ibar end\n");
-            has_ibar_end = 1;
-            exit(0);
+        struct qemu_plugin_insn* insn = qemu_plugin_tb_get_insn(tb, i);
+        if (is_loongarch) {
+            const uint32_t* data = (uint32_t*)qemu_plugin_insn_data(insn);
+            if (*data == 0x38728040) {
+                fprintf(stderr, "ibar begin\n");
+                if (!has_ibar_begin) {
+                    icount = 0;
+                }
+                has_ibar_begin = 1;
+            }
+            if (*data == 0x38728041) {
+                fprintf(stderr, "ibar end\n");
+                has_ibar_end = 1;
+                exit(0);
+            }
         }
     }
     udata = (void*)&(pc_id_count[pc].count);
@@ -167,6 +175,7 @@ int qemu_plugin_install(qemu_plugin_id_t id, const qemu_info_t *info,
 
     interval_size = get_u64_or_else(argc,argv,"size", interval_size);
     bench_name    = find_arg_or_else(argc,argv,"name","result");
+    has_ibar_begin = !plugin_args_get_bool_or_else(argc, argv, "check_ibar", false);
 
     plugin_init(info);
 

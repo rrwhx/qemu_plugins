@@ -22,6 +22,7 @@ extern "C" {
 #include "qemu-plugin.h"
 }
 
+#include "util.h"
 #include "loongarch_decode_insns.c.inc"
 
 QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
@@ -168,15 +169,6 @@ int64_t simpoints[MAX_SIMPOINTS_NUM];
 size_t simpoints_num;
 
 long long SM_INTERVAL = 1000000;
-
-static inline FILE* fopen_nofail(const char *__restrict __filename, const char *__restrict __modes) {
-    FILE* f = fopen(__filename, __modes);
-    if (!f) {
-        perror(__filename);
-        abort();
-    }
-    return f;
-}
 
 static int cmpfunc (const void * a, const void * b) {
     // reverse
@@ -518,6 +510,7 @@ int qemu_plugin_install(qemu_plugin_id_t id, const qemu_info_t *info,
 {
     plugin_init(info);
 
+    has_ibar_begin = !plugin_args_get_bool_or_else(argc, argv, "check_ibar", false);
     qemu_plugin_register_vcpu_tb_trans_cb(id, tb_record);
     qemu_plugin_register_atexit_cb(id, plugin_exit, NULL);
     return 0;
