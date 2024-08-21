@@ -68,7 +68,7 @@ struct target_info{
     // void (*disas_log)(const DisasContextBase *db, CPUState *cpu, FILE *f);
 };
 target_info all_archs[] = {
-    { "aarch64",   CS_ARCH_AARCH64, cs_mode(CS_MODE_LITTLE_ENDIAN)                    , AArch64_INS_ENDING,},
+    { "aarch64",   CS_ARCH_AARCH64, cs_mode(CS_MODE_LITTLE_ENDIAN)                    , AARCH64_INS_ENDING,},
     { "mips64el",  CS_ARCH_MIPS,    cs_mode(CS_MODE_MIPS64 | CS_MODE_LITTLE_ENDIAN)   , MIPS_INS_ENDING , },
     { "mips64",    CS_ARCH_MIPS,    cs_mode(CS_MODE_MIPS64 | CS_MODE_BIG_ENDIAN)      , MIPS_INS_ENDING , },
     { "i386",      CS_ARCH_X86,     cs_mode(CS_MODE_32)                               , X86_INS_ENDING  , },
@@ -172,10 +172,9 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
         size_t count = cs_disasm(cs_handle, (const uint8_t*)data, size, addr, 1, &cs_insn);
         int imm;
         int base;
-        if (count > 0) {
-            for (int i = 0; i < cs_insn->detail->x86.op_count; i++) {
-                if (cs_insn->detail->x86.operands[i].type == X86_OP_IMM) {
-                    imm = cs_insn->detail->x86.operands[i].imm;
+        if (count > 0 && (cs_insn->id == X86_INS_MOVSD || cs_insn->id == X86_INS_VMOVSD)) {
+                if (cs_insn->detail->x86.operands[1].type == X86_OP_MEM) {
+                    imm = cs_insn->detail->x86.operands[i].mem.disp;
                     if (x86_is_branch(cs_insn)) {
                         imm = imm - (addr + size);
                     }
@@ -191,7 +190,6 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
                         // printf("%16lx: %-15s%s\n", addr, cs_insn->mnemonic, cs_insn->op_str);
                     }
                 }
-            }
         
             cs_free(cs_insn, count);
         }

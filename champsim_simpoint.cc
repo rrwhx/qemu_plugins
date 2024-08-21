@@ -137,21 +137,21 @@ int aarch64_insn_is_branch(const cs_insn * insn) {
     }
     switch (insn->id)
     {
-    case AArch64_INS_BC:
-    case AArch64_INS_CBNZ:
-    case AArch64_INS_CBZ:
-    case AArch64_INS_TBNZ:
-    case AArch64_INS_TBZ:
-    case AArch64_INS_B://cs bug
+    case AARCH64_INS_BC:
+    case AARCH64_INS_CBNZ:
+    case AARCH64_INS_CBZ:
+    case AARCH64_INS_TBNZ:
+    case AARCH64_INS_TBZ:
+    case AARCH64_INS_B://cs bug
         return BRANCH_CONDITIONAL;
         // return BRANCH_DIRECT_JUMP;
-    case AArch64_INS_BL:
+    case AARCH64_INS_BL:
         return BRANCH_DIRECT_CALL;
-    case AArch64_INS_BLR:
+    case AARCH64_INS_BLR:
         return BRANCH_INDIRECT_CALL;
-    case AArch64_INS_BR:
+    case AARCH64_INS_BR:
         return BRANCH_INDIRECT;
-    case AArch64_INS_RET:
+    case AARCH64_INS_RET:
         return BRANCH_RETURN;
     default:
         return NOT_BRANCH;
@@ -192,7 +192,7 @@ struct target_info{
 
 
 target_info all_archs[] = {
-    { "aarch64",   CS_ARCH_AARCH64, cs_mode(CS_MODE_LITTLE_ENDIAN)                  , AArch64_INS_ENDING, aarch64_insn_is_branch},
+    { "aarch64",   CS_ARCH_AARCH64, cs_mode(CS_MODE_LITTLE_ENDIAN)                  , AARCH64_INS_ENDING, aarch64_insn_is_branch},
     { "mips64el",  CS_ARCH_MIPS,  cs_mode(CS_MODE_MIPS64 | CS_MODE_LITTLE_ENDIAN)   , MIPS_INS_ENDING , },
     { "mips64",    CS_ARCH_MIPS,  cs_mode(CS_MODE_MIPS64 | CS_MODE_BIG_ENDIAN)      , MIPS_INS_ENDING , },
     { "i386",      CS_ARCH_X86,   cs_mode(CS_MODE_32)                               , X86_INS_ENDING  , },
