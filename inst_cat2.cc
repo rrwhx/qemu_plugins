@@ -341,16 +341,16 @@ int x86_get_insn_cat(const cs_insn * insn) {
 }
 
 int aarch64_op_is_gr(cs_aarch64_op* op) {
-    if (op->type == AArch64_OP_REG) {
+    if (op->type == AARCH64_OP_REG) {
         switch (op->reg) {
-            case AArch64_REG_XZR:
-            case AArch64_REG_WZR:
-            case AArch64_REG_WSP:
-            case AArch64_REG_FP:
-            case AArch64_REG_LR:
-            case AArch64_REG_SP:
-            case AArch64_REG_X0 ... AArch64_REG_X28:
-            case AArch64_REG_W0 ... AArch64_REG_W30:
+            case AARCH64_REG_XZR:
+            case AARCH64_REG_WZR:
+            case AARCH64_REG_WSP:
+            case AARCH64_REG_FP:
+            case AARCH64_REG_LR:
+            case AARCH64_REG_SP:
+            case AARCH64_REG_X0 ... AARCH64_REG_X28:
+            case AARCH64_REG_W0 ... AARCH64_REG_W30:
                 return true;
             default:
                 return false;
@@ -360,13 +360,13 @@ int aarch64_op_is_gr(cs_aarch64_op* op) {
 }
 
 int aarch64_op_is_fr(cs_aarch64_op* op) {
-    if (op->type == AArch64_OP_REG) {
+    if (op->type == AARCH64_OP_REG) {
         switch (op->reg) {
-            case AArch64_REG_H0 ... AArch64_REG_H31:
-            case AArch64_REG_B0 ... AArch64_REG_B31:
-            case AArch64_REG_S0 ... AArch64_REG_S31:
-            case AArch64_REG_D0 ... AArch64_REG_D31:
-            case AArch64_REG_Q0 ... AArch64_REG_Q31:
+            case AARCH64_REG_H0 ... AARCH64_REG_H31:
+            case AARCH64_REG_B0 ... AARCH64_REG_B31:
+            case AARCH64_REG_S0 ... AARCH64_REG_S31:
+            case AARCH64_REG_D0 ... AARCH64_REG_D31:
+            case AARCH64_REG_Q0 ... AARCH64_REG_Q31:
                 return true;
             default:
                 return false;
@@ -376,7 +376,7 @@ int aarch64_op_is_fr(cs_aarch64_op* op) {
 }
 
 int aarch64_op_is_imm(cs_aarch64_op* op) {
-    return op->type == AArch64_OP_IMM;
+    return op->type == AARCH64_OP_IMM;
 }
 
 int aarch64_get_insn_cat(const cs_insn * insn) {
@@ -394,31 +394,31 @@ int aarch64_get_insn_cat(const cs_insn * insn) {
     }
     
     switch (insn->alias_id) {
-    case AArch64_INS_ALIAS_NOP:
+    case AARCH64_INS_ALIAS_NOP:
         return INST_NOP;
-    case AArch64_INS_ALIAS_LSL:
-    case AArch64_INS_ALIAS_LSR:
-    case AArch64_INS_ALIAS_ASR:
+    case AARCH64_INS_ALIAS_LSL:
+    case AARCH64_INS_ALIAS_LSR:
+    case AARCH64_INS_ALIAS_ASR:
         g_assert(first_op_isgr);
         return INST_SHIFT;
-    case AArch64_INS_ALIAS_SXTB:
-    case AArch64_INS_ALIAS_SXTH:
-    case AArch64_INS_ALIAS_SXTW:
-    case AArch64_INS_ALIAS_UXTB:
-    case AArch64_INS_ALIAS_UXTH:
-    case AArch64_INS_ALIAS_UXTW:
-    case AArch64_INS_ALIAS_SBFX:
-    case AArch64_INS_ALIAS_UBFX:
-    case AArch64_INS_ALIAS_SBFIZ:
-    case AArch64_INS_ALIAS_UBFIZ:
-    case AArch64_INS_ALIAS_BFC:
-    case AArch64_INS_ALIAS_BFI:
-    case AArch64_INS_ALIAS_BFXIL:
+    case AARCH64_INS_ALIAS_SXTB:
+    case AARCH64_INS_ALIAS_SXTH:
+    case AARCH64_INS_ALIAS_SXTW:
+    case AARCH64_INS_ALIAS_UXTB:
+    case AARCH64_INS_ALIAS_UXTH:
+    case AARCH64_INS_ALIAS_UXTW:
+    case AARCH64_INS_ALIAS_SBFX:
+    case AARCH64_INS_ALIAS_UBFX:
+    case AARCH64_INS_ALIAS_SBFIZ:
+    case AARCH64_INS_ALIAS_UBFIZ:
+    case AARCH64_INS_ALIAS_BFC:
+    case AARCH64_INS_ALIAS_BFI:
+    case AARCH64_INS_ALIAS_BFXIL:
         g_assert(first_op_isgr);
         return INST_ARITH;
-    case AArch64_INS_ALIAS_BTI:
+    case AARCH64_INS_ALIAS_BTI:
         return INST_OTHER;
-    case AArch64_INS_ALIAS_MVN:
+    case AARCH64_INS_ALIAS_MVN:
         if(first_op_isgr) {
             return INST_ARITH;
         } else if(first_op_isfr) {
@@ -429,30 +429,30 @@ int aarch64_get_insn_cat(const cs_insn * insn) {
     }
     switch (insn->id)
     {
-    case AArch64_INS_ADC:
-    case AArch64_INS_ADCS:
-    case AArch64_INS_ADD:
-    case AArch64_INS_ADDS:
-    case AArch64_INS_ADR:
-    case AArch64_INS_ADRP:
-    case AArch64_INS_MADD:
-    case AArch64_INS_MSUB:
-    case AArch64_INS_MUL:
-    case AArch64_INS_NEG:
-    case AArch64_INS_SBC:
-    case AArch64_INS_SBCS:
-    case AArch64_INS_SDIV:
-    case AArch64_INS_SMADDL:
-    case AArch64_INS_SMSUBL:
-    case AArch64_INS_SMULH:
-    case AArch64_INS_SMULL:
-    case AArch64_INS_SUB:
-    case AArch64_INS_SUBS:
-    case AArch64_INS_UDIV:
-    case AArch64_INS_UMADDL:
-    case AArch64_INS_UMSUBL:
-    case AArch64_INS_UMULH:
-    case AArch64_INS_UMULL:
+    case AARCH64_INS_ADC:
+    case AARCH64_INS_ADCS:
+    case AARCH64_INS_ADD:
+    case AARCH64_INS_ADDS:
+    case AARCH64_INS_ADR:
+    case AARCH64_INS_ADRP:
+    case AARCH64_INS_MADD:
+    case AARCH64_INS_MSUB:
+    case AARCH64_INS_MUL:
+    case AARCH64_INS_NEG:
+    case AARCH64_INS_SBC:
+    case AARCH64_INS_SBCS:
+    case AARCH64_INS_SDIV:
+    case AARCH64_INS_SMADDL:
+    case AARCH64_INS_SMSUBL:
+    case AARCH64_INS_SMULH:
+    case AARCH64_INS_SMULL:
+    case AARCH64_INS_SUB:
+    case AARCH64_INS_SUBS:
+    case AARCH64_INS_UDIV:
+    case AARCH64_INS_UMADDL:
+    case AARCH64_INS_UMSUBL:
+    case AARCH64_INS_UMULH:
+    case AARCH64_INS_UMULL:
         if (first_op_isgr) {
             return INST_ARITH;
         } else if (first_op_isfr) {
@@ -460,18 +460,18 @@ int aarch64_get_insn_cat(const cs_insn * insn) {
         }
         break;
 
-    case AArch64_INS_CLS:
-    case AArch64_INS_CLZ:
-    case AArch64_INS_EXTR:
-    case AArch64_INS_RBIT:
-    case AArch64_INS_REV:
-    case AArch64_INS_REV16:
-    case AArch64_INS_REV32:
-    case AArch64_INS_SXTB:
-    case AArch64_INS_SXTH:
-    case AArch64_INS_UXTB:
-    case AArch64_INS_UXTH:
-    case AArch64_INS_SXTW:
+    case AARCH64_INS_CLS:
+    case AARCH64_INS_CLZ:
+    case AARCH64_INS_EXTR:
+    case AARCH64_INS_RBIT:
+    case AARCH64_INS_REV:
+    case AARCH64_INS_REV16:
+    case AARCH64_INS_REV32:
+    case AARCH64_INS_SXTB:
+    case AARCH64_INS_SXTH:
+    case AARCH64_INS_UXTB:
+    case AARCH64_INS_UXTH:
+    case AARCH64_INS_SXTW:
         if (first_op_isgr) {
             return INST_LOGIC;
         } else if (first_op_isfr) {
@@ -479,17 +479,17 @@ int aarch64_get_insn_cat(const cs_insn * insn) {
         }
         break;
 
-    case AArch64_INS_AND:
-    case AArch64_INS_ANDS:
-    case AArch64_INS_BIC:
-    case AArch64_INS_BICS:
-    case AArch64_INS_EON:
-    case AArch64_INS_EOR:
-    case AArch64_INS_MOVK:
-    case AArch64_INS_MOVN:
-    case AArch64_INS_MOVZ:
-    case AArch64_INS_ORN:
-    case AArch64_INS_ORR:
+    case AARCH64_INS_AND:
+    case AARCH64_INS_ANDS:
+    case AARCH64_INS_BIC:
+    case AARCH64_INS_BICS:
+    case AARCH64_INS_EON:
+    case AARCH64_INS_EOR:
+    case AARCH64_INS_MOVK:
+    case AARCH64_INS_MOVN:
+    case AARCH64_INS_MOVZ:
+    case AARCH64_INS_ORN:
+    case AARCH64_INS_ORR:
         if (first_op_isgr) {
             return INST_LOGIC;
         } else if (first_op_isfr) {
@@ -497,10 +497,10 @@ int aarch64_get_insn_cat(const cs_insn * insn) {
         }
         break;
 
-    case AArch64_INS_ASR:
-    case AArch64_INS_LSL:
-    case AArch64_INS_LSR:
-    case AArch64_INS_ROR:
+    case AARCH64_INS_ASR:
+    case AARCH64_INS_LSL:
+    case AARCH64_INS_LSR:
+    case AARCH64_INS_ROR:
         if (first_op_isgr) {
             return INST_SHIFT;
         } else if (first_op_isfr) {
@@ -508,180 +508,180 @@ int aarch64_get_insn_cat(const cs_insn * insn) {
         }
         break;
 
-    case AArch64_INS_BC:
-    case AArch64_INS_CBNZ:
-    case AArch64_INS_CBZ:
-    case AArch64_INS_TBNZ:
-    case AArch64_INS_TBZ:
-    case AArch64_INS_B:
-    case AArch64_INS_BL:
-    case AArch64_INS_BLR:
-    case AArch64_INS_BR:
-    case AArch64_INS_RET:
+    case AARCH64_INS_BC:
+    case AARCH64_INS_CBNZ:
+    case AARCH64_INS_CBZ:
+    case AARCH64_INS_TBNZ:
+    case AARCH64_INS_TBZ:
+    case AARCH64_INS_B:
+    case AARCH64_INS_BL:
+    case AARCH64_INS_BLR:
+    case AARCH64_INS_BR:
+    case AARCH64_INS_RET:
         return INST_BRANCH;
 
-    case AArch64_INS_CASA:
-    case AArch64_INS_CASAL:
-    case AArch64_INS_CASL:
-    case AArch64_INS_CASAB:
-    case AArch64_INS_CASALB:
-    case AArch64_INS_CASLB:
-    case AArch64_INS_CASAH:
-    case AArch64_INS_CASALH:
-    case AArch64_INS_CASLH:
-    case AArch64_INS_CASPA:
-    case AArch64_INS_CASPAL:
-    case AArch64_INS_CASPL:
+    case AARCH64_INS_CASA:
+    case AARCH64_INS_CASAL:
+    case AARCH64_INS_CASL:
+    case AARCH64_INS_CASAB:
+    case AARCH64_INS_CASALB:
+    case AARCH64_INS_CASLB:
+    case AARCH64_INS_CASAH:
+    case AARCH64_INS_CASALH:
+    case AARCH64_INS_CASLH:
+    case AARCH64_INS_CASPA:
+    case AARCH64_INS_CASPAL:
+    case AARCH64_INS_CASPL:
 
-    case AArch64_INS_LDADDA:
-    case AArch64_INS_LDADDAB:
-    case AArch64_INS_LDADDAH:
-    case AArch64_INS_LDCLRA:
-    case AArch64_INS_LDCLRAB:
-    case AArch64_INS_LDCLRAH:
-    case AArch64_INS_LDEORA:
-    case AArch64_INS_LDEORAB:
-    case AArch64_INS_LDEORAH:
-    case AArch64_INS_LDSETA:
-    case AArch64_INS_LDSETAB:
-    case AArch64_INS_LDSETAH:
-    case AArch64_INS_LDSMAXA:
-    case AArch64_INS_LDSMAXAB:
-    case AArch64_INS_LDSMAXAH:
-    case AArch64_INS_LDSMINA:
-    case AArch64_INS_LDSMINAB:
-    case AArch64_INS_LDSMINAH:
-    case AArch64_INS_LDUMAXA:
-    case AArch64_INS_LDUMAXAB:
-    case AArch64_INS_LDUMAXAH:
-    case AArch64_INS_LDUMINA:
-    case AArch64_INS_LDUMINAB:
-    case AArch64_INS_LDUMINAH:
+    case AARCH64_INS_LDADDA:
+    case AARCH64_INS_LDADDAB:
+    case AARCH64_INS_LDADDAH:
+    case AARCH64_INS_LDCLRA:
+    case AARCH64_INS_LDCLRAB:
+    case AARCH64_INS_LDCLRAH:
+    case AARCH64_INS_LDEORA:
+    case AARCH64_INS_LDEORAB:
+    case AARCH64_INS_LDEORAH:
+    case AARCH64_INS_LDSETA:
+    case AARCH64_INS_LDSETAB:
+    case AARCH64_INS_LDSETAH:
+    case AARCH64_INS_LDSMAXA:
+    case AARCH64_INS_LDSMAXAB:
+    case AARCH64_INS_LDSMAXAH:
+    case AARCH64_INS_LDSMINA:
+    case AARCH64_INS_LDSMINAB:
+    case AARCH64_INS_LDSMINAH:
+    case AARCH64_INS_LDUMAXA:
+    case AARCH64_INS_LDUMAXAB:
+    case AARCH64_INS_LDUMAXAH:
+    case AARCH64_INS_LDUMINA:
+    case AARCH64_INS_LDUMINAB:
+    case AARCH64_INS_LDUMINAH:
 
-    case AArch64_INS_LDADDAL:
-    case AArch64_INS_LDADDALB:
-    case AArch64_INS_LDADDALH:
-    case AArch64_INS_LDCLRAL:
-    case AArch64_INS_LDCLRALB:
-    case AArch64_INS_LDCLRALH:
-    case AArch64_INS_LDEORAL:
-    case AArch64_INS_LDEORALB:
-    case AArch64_INS_LDEORALH:
-    case AArch64_INS_LDSETAL:
-    case AArch64_INS_LDSETALB:
-    case AArch64_INS_LDSETALH:
-    case AArch64_INS_LDSMAXAL:
-    case AArch64_INS_LDSMAXALB:
-    case AArch64_INS_LDSMAXALH:
-    case AArch64_INS_LDSMINAL:
-    case AArch64_INS_LDSMINALB:
-    case AArch64_INS_LDSMINALH:
-    case AArch64_INS_LDUMAXAL:
-    case AArch64_INS_LDUMAXALB:
-    case AArch64_INS_LDUMAXALH:
-    case AArch64_INS_LDUMINAL:
-    case AArch64_INS_LDUMINALB:
-    case AArch64_INS_LDUMINALH:
+    case AARCH64_INS_LDADDAL:
+    case AARCH64_INS_LDADDALB:
+    case AARCH64_INS_LDADDALH:
+    case AARCH64_INS_LDCLRAL:
+    case AARCH64_INS_LDCLRALB:
+    case AARCH64_INS_LDCLRALH:
+    case AARCH64_INS_LDEORAL:
+    case AARCH64_INS_LDEORALB:
+    case AARCH64_INS_LDEORALH:
+    case AARCH64_INS_LDSETAL:
+    case AARCH64_INS_LDSETALB:
+    case AARCH64_INS_LDSETALH:
+    case AARCH64_INS_LDSMAXAL:
+    case AARCH64_INS_LDSMAXALB:
+    case AARCH64_INS_LDSMAXALH:
+    case AARCH64_INS_LDSMINAL:
+    case AARCH64_INS_LDSMINALB:
+    case AARCH64_INS_LDSMINALH:
+    case AARCH64_INS_LDUMAXAL:
+    case AARCH64_INS_LDUMAXALB:
+    case AARCH64_INS_LDUMAXALH:
+    case AARCH64_INS_LDUMINAL:
+    case AARCH64_INS_LDUMINALB:
+    case AARCH64_INS_LDUMINALH:
 
-    case AArch64_INS_LDADDL:
-    case AArch64_INS_LDADDLB:
-    case AArch64_INS_LDADDLH:
-    case AArch64_INS_LDCLRL:
-    case AArch64_INS_LDCLRLB:
-    case AArch64_INS_LDCLRLH:
-    case AArch64_INS_LDEORL:
-    case AArch64_INS_LDEORLB:
-    case AArch64_INS_LDEORLH:
-    case AArch64_INS_LDSETL:
-    case AArch64_INS_LDSETLB:
-    case AArch64_INS_LDSETLH:
-    case AArch64_INS_LDSMAXL:
-    case AArch64_INS_LDSMAXLB:
-    case AArch64_INS_LDSMAXLH:
-    case AArch64_INS_LDSMINL:
-    case AArch64_INS_LDSMINLB:
-    case AArch64_INS_LDSMINLH:
-    case AArch64_INS_LDUMAXL:
-    case AArch64_INS_LDUMAXLB:
-    case AArch64_INS_LDUMAXLH:
-    case AArch64_INS_LDUMINL:
-    case AArch64_INS_LDUMINLB:
-    case AArch64_INS_LDUMINLH:
+    case AARCH64_INS_LDADDL:
+    case AARCH64_INS_LDADDLB:
+    case AARCH64_INS_LDADDLH:
+    case AARCH64_INS_LDCLRL:
+    case AARCH64_INS_LDCLRLB:
+    case AARCH64_INS_LDCLRLH:
+    case AARCH64_INS_LDEORL:
+    case AARCH64_INS_LDEORLB:
+    case AARCH64_INS_LDEORLH:
+    case AARCH64_INS_LDSETL:
+    case AARCH64_INS_LDSETLB:
+    case AARCH64_INS_LDSETLH:
+    case AARCH64_INS_LDSMAXL:
+    case AARCH64_INS_LDSMAXLB:
+    case AARCH64_INS_LDSMAXLH:
+    case AARCH64_INS_LDSMINL:
+    case AARCH64_INS_LDSMINLB:
+    case AARCH64_INS_LDSMINLH:
+    case AARCH64_INS_LDUMAXL:
+    case AARCH64_INS_LDUMAXLB:
+    case AARCH64_INS_LDUMAXLH:
+    case AARCH64_INS_LDUMINL:
+    case AARCH64_INS_LDUMINLB:
+    case AARCH64_INS_LDUMINLH:
 
-    case AArch64_INS_SWPA:
-    case AArch64_INS_SWPAL:
-    case AArch64_INS_SWPL:
-    case AArch64_INS_SWPAB:
-    case AArch64_INS_SWPALB:
-    case AArch64_INS_SWPLB:
-    case AArch64_INS_SWPAH:
-    case AArch64_INS_SWPALH:
-    case AArch64_INS_SWPLH:
+    case AARCH64_INS_SWPA:
+    case AARCH64_INS_SWPAL:
+    case AARCH64_INS_SWPL:
+    case AARCH64_INS_SWPAB:
+    case AARCH64_INS_SWPALB:
+    case AARCH64_INS_SWPLB:
+    case AARCH64_INS_SWPAH:
+    case AARCH64_INS_SWPALH:
+    case AARCH64_INS_SWPLH:
 
-    case AArch64_INS_LDAXRB:
-    case AArch64_INS_LDAXRH:
-    case AArch64_INS_LDAXR:
-    case AArch64_INS_LDAXP:
-    case AArch64_INS_LDXRB:
-    case AArch64_INS_LDXRH:
-    case AArch64_INS_LDXR:
-    case AArch64_INS_LDXP:
-    case AArch64_INS_STXRB:
-    case AArch64_INS_STXRH:
-    case AArch64_INS_STXR:
-    case AArch64_INS_STXP:
-    case AArch64_INS_LDLARB:
-    case AArch64_INS_LDLARH:
-    case AArch64_INS_LDLAR:
-    case AArch64_INS_STLXRB:
-    case AArch64_INS_STLXRH:
-    case AArch64_INS_STLXR:
-    case AArch64_INS_STLXP:
-    case AArch64_INS_LDARB:
-    case AArch64_INS_LDARH:
-    case AArch64_INS_LDAR:
-    case AArch64_INS_STLRB:
-    case AArch64_INS_STLRH:
-    case AArch64_INS_STLR:
+    case AARCH64_INS_LDAXRB:
+    case AARCH64_INS_LDAXRH:
+    case AARCH64_INS_LDAXR:
+    case AARCH64_INS_LDAXP:
+    case AARCH64_INS_LDXRB:
+    case AARCH64_INS_LDXRH:
+    case AARCH64_INS_LDXR:
+    case AARCH64_INS_LDXP:
+    case AARCH64_INS_STXRB:
+    case AARCH64_INS_STXRH:
+    case AARCH64_INS_STXR:
+    case AARCH64_INS_STXP:
+    case AARCH64_INS_LDLARB:
+    case AARCH64_INS_LDLARH:
+    case AARCH64_INS_LDLAR:
+    case AARCH64_INS_STLXRB:
+    case AARCH64_INS_STLXRH:
+    case AARCH64_INS_STLXR:
+    case AARCH64_INS_STLXP:
+    case AARCH64_INS_LDARB:
+    case AARCH64_INS_LDARH:
+    case AARCH64_INS_LDAR:
+    case AARCH64_INS_STLRB:
+    case AARCH64_INS_STLRH:
+    case AARCH64_INS_STLR:
 
-    case AArch64_INS_DMB:
+    case AARCH64_INS_DMB:
         return INST_ATOMIC;
     
-    case AArch64_INS_CCMN:
-    case AArch64_INS_CCMP:
-    case AArch64_INS_CSEL:
-    case AArch64_INS_CSINC:
-    case AArch64_INS_CSINV:
-    case AArch64_INS_CSNEG:
+    case AARCH64_INS_CCMN:
+    case AARCH64_INS_CCMP:
+    case AARCH64_INS_CSEL:
+    case AARCH64_INS_CSINC:
+    case AARCH64_INS_CSINV:
+    case AARCH64_INS_CSNEG:
         return INST_CC_OP;
 
-    case AArch64_INS_LDP:
-    case AArch64_INS_LDPSW:
-    case AArch64_INS_LDR:
-    case AArch64_INS_LDUR:
-    case AArch64_INS_LDRB:
-    case AArch64_INS_LDURB:
-    case AArch64_INS_LDRH:
-    case AArch64_INS_LDURH:
-    case AArch64_INS_LDRSB:
-    case AArch64_INS_LDURSB:
-    case AArch64_INS_LDRSH:
-    case AArch64_INS_LDURSH:
-    case AArch64_INS_LDRSW:
-    case AArch64_INS_LDURSW:
+    case AARCH64_INS_LDP:
+    case AARCH64_INS_LDPSW:
+    case AARCH64_INS_LDR:
+    case AARCH64_INS_LDUR:
+    case AARCH64_INS_LDRB:
+    case AARCH64_INS_LDURB:
+    case AARCH64_INS_LDRH:
+    case AARCH64_INS_LDURH:
+    case AARCH64_INS_LDRSB:
+    case AARCH64_INS_LDURSB:
+    case AARCH64_INS_LDRSH:
+    case AARCH64_INS_LDURSH:
+    case AARCH64_INS_LDRSW:
+    case AARCH64_INS_LDURSW:
         if (first_op_isgr) {
             return INST_LOAD;
         } else if (first_op_isfr) {
             return INST_FP_LOAD;
         }
 
-    case AArch64_INS_STP:
-    case AArch64_INS_STR:
-    case AArch64_INS_STUR:
-    case AArch64_INS_STRB:
-    case AArch64_INS_STURB:
-    case AArch64_INS_STRH:
-    case AArch64_INS_STURH:
+    case AARCH64_INS_STP:
+    case AARCH64_INS_STR:
+    case AARCH64_INS_STUR:
+    case AARCH64_INS_STRB:
+    case AARCH64_INS_STURB:
+    case AARCH64_INS_STRH:
+    case AARCH64_INS_STURH:
         if (first_op_isgr) {
             return INST_STORE;
         } else if (first_op_isfr) {
@@ -689,318 +689,318 @@ int aarch64_get_insn_cat(const cs_insn * insn) {
         }
         break;
 
-    case AArch64_INS_SVC:
+    case AARCH64_INS_SVC:
         return INST_SYSCALL;
 
-    case AArch64_INS_LD1:
-    case AArch64_INS_LD2:
-    case AArch64_INS_LD3:
-    case AArch64_INS_LD4:
-    case AArch64_INS_LD1R:
-    case AArch64_INS_LD2R:
-    case AArch64_INS_LD3R:
-    case AArch64_INS_LD4R:
+    case AARCH64_INS_LD1:
+    case AARCH64_INS_LD2:
+    case AARCH64_INS_LD3:
+    case AARCH64_INS_LD4:
+    case AARCH64_INS_LD1R:
+    case AARCH64_INS_LD2R:
+    case AARCH64_INS_LD3R:
+    case AARCH64_INS_LD4R:
         return INST_FP_LOAD;
 
-    case AArch64_INS_ST1:
-    case AArch64_INS_ST2:
-    case AArch64_INS_ST3:
-    case AArch64_INS_ST4:
+    case AARCH64_INS_ST1:
+    case AARCH64_INS_ST2:
+    case AARCH64_INS_ST3:
+    case AARCH64_INS_ST4:
         return INST_FP_STORE;
 
-    case AArch64_INS_UMOV:
+    case AARCH64_INS_UMOV:
         return INST_GR_FR_MOV;
 
 
-    case AArch64_INS_FABD:
-    case AArch64_INS_FABS:
-    case AArch64_INS_FACGE:
-    case AArch64_INS_FACGT:
-    case AArch64_INS_FADD:
-    case AArch64_INS_FADDP:
-    case AArch64_INS_FDIV:
-    case AArch64_INS_FMLA:
-    case AArch64_INS_FMLAL:
-    case AArch64_INS_FMLAL2:
-    case AArch64_INS_FMADD:
-    case AArch64_INS_FNMADD:
-    case AArch64_INS_FMSUB:
-    case AArch64_INS_FNMSUB:
-    case AArch64_INS_FNEG:
-    case AArch64_INS_FMUL:
-    case AArch64_INS_FMULX:
-    case AArch64_INS_FNMUL:
-    case AArch64_INS_FSQRT:
-    case AArch64_INS_FSUB:
+    case AARCH64_INS_FABD:
+    case AARCH64_INS_FABS:
+    case AARCH64_INS_FACGE:
+    case AARCH64_INS_FACGT:
+    case AARCH64_INS_FADD:
+    case AARCH64_INS_FADDP:
+    case AARCH64_INS_FDIV:
+    case AARCH64_INS_FMLA:
+    case AARCH64_INS_FMLAL:
+    case AARCH64_INS_FMLAL2:
+    case AARCH64_INS_FMADD:
+    case AARCH64_INS_FNMADD:
+    case AARCH64_INS_FMSUB:
+    case AARCH64_INS_FNMSUB:
+    case AARCH64_INS_FNEG:
+    case AARCH64_INS_FMUL:
+    case AARCH64_INS_FMULX:
+    case AARCH64_INS_FNMUL:
+    case AARCH64_INS_FSQRT:
+    case AARCH64_INS_FSUB:
 
-    case AArch64_INS_FCSEL:
+    case AARCH64_INS_FCSEL:
 
-    case AArch64_INS_FRINT32X:
-    case AArch64_INS_FRINT32Z:
-    case AArch64_INS_FRINT64X:
-    case AArch64_INS_FRINT64Z:
+    case AARCH64_INS_FRINT32X:
+    case AARCH64_INS_FRINT32Z:
+    case AARCH64_INS_FRINT64X:
+    case AARCH64_INS_FRINT64Z:
 
-    case AArch64_INS_FRINTA:
-    case AArch64_INS_FRINTM:
-    case AArch64_INS_FRINTN:
-    case AArch64_INS_FRINTP:
-    case AArch64_INS_FRINTI:
-    case AArch64_INS_FRINTZ:
+    case AARCH64_INS_FRINTA:
+    case AARCH64_INS_FRINTM:
+    case AARCH64_INS_FRINTN:
+    case AARCH64_INS_FRINTP:
+    case AARCH64_INS_FRINTI:
+    case AARCH64_INS_FRINTZ:
 
-    case AArch64_INS_SCVTF:
-    case AArch64_INS_UCVTF:
+    case AARCH64_INS_SCVTF:
+    case AARCH64_INS_UCVTF:
 
-    case AArch64_INS_FCCMP:
-    case AArch64_INS_FCCMPE:
-    case AArch64_INS_FCMP:
-    case AArch64_INS_FCMPE:
+    case AARCH64_INS_FCCMP:
+    case AARCH64_INS_FCCMPE:
+    case AARCH64_INS_FCMP:
+    case AARCH64_INS_FCMPE:
 
-    case AArch64_INS_FCMEQ:
-    case AArch64_INS_FCMNE:
-    case AArch64_INS_FCMGE:
-    case AArch64_INS_FCMLE:
-    case AArch64_INS_FCMGT:
-    case AArch64_INS_FCMLT:
-    case AArch64_INS_FCMUO:
+    case AARCH64_INS_FCMEQ:
+    case AARCH64_INS_FCMNE:
+    case AARCH64_INS_FCMGE:
+    case AARCH64_INS_FCMLE:
+    case AARCH64_INS_FCMGT:
+    case AARCH64_INS_FCMLT:
+    case AARCH64_INS_FCMUO:
 
-    case AArch64_INS_FMAX:
-    case AArch64_INS_FMAXNM:
-    case AArch64_INS_FMAXP:
-    case AArch64_INS_FMAXNMP:
-    case AArch64_INS_FMAXV:
-    case AArch64_INS_FMAXNMV:
-    case AArch64_INS_FMIN:
-    case AArch64_INS_FMINNM:
-    case AArch64_INS_FMINP:
-    case AArch64_INS_FMINNMP:
-    case AArch64_INS_FMINV:
-    case AArch64_INS_FMINNMV:
+    case AARCH64_INS_FMAX:
+    case AARCH64_INS_FMAXNM:
+    case AARCH64_INS_FMAXP:
+    case AARCH64_INS_FMAXNMP:
+    case AARCH64_INS_FMAXV:
+    case AARCH64_INS_FMAXNMV:
+    case AARCH64_INS_FMIN:
+    case AARCH64_INS_FMINNM:
+    case AARCH64_INS_FMINP:
+    case AARCH64_INS_FMINNMP:
+    case AARCH64_INS_FMINV:
+    case AARCH64_INS_FMINNMV:
 
-    case AArch64_INS_BFDOT:
-    case AArch64_INS_BFMLALB:
-    case AArch64_INS_BFMLALT:
-    case AArch64_INS_BFMMLA:
-    case AArch64_INS_FCADD:
-    case AArch64_INS_FCMLA:
-    case AArch64_INS_FRECPE:
-    case AArch64_INS_FRECPS:
-    case AArch64_INS_FRECPX:
-    case AArch64_INS_FRSQRTE:
-    case AArch64_INS_FRSQRTS:
+    case AARCH64_INS_BFDOT:
+    case AARCH64_INS_BFMLALB:
+    case AARCH64_INS_BFMLALT:
+    case AARCH64_INS_BFMMLA:
+    case AARCH64_INS_FCADD:
+    case AARCH64_INS_FCMLA:
+    case AARCH64_INS_FRECPE:
+    case AARCH64_INS_FRECPS:
+    case AARCH64_INS_FRECPX:
+    case AARCH64_INS_FRSQRTE:
+    case AARCH64_INS_FRSQRTS:
 
-    case AArch64_INS_ABS:
-    case AArch64_INS_ADDP:
-    case AArch64_INS_ADDV:
-    case AArch64_INS_ADDHN:
-    case AArch64_INS_ADDHN2:
-    case AArch64_INS_RADDHN:
-    case AArch64_INS_RADDHN2:
-    case AArch64_INS_SUBHN:
-    case AArch64_INS_SUBHN2:
-    case AArch64_INS_RSUBHN:
-    case AArch64_INS_RSUBHN2:
+    case AARCH64_INS_ABS:
+    case AARCH64_INS_ADDP:
+    case AARCH64_INS_ADDV:
+    case AARCH64_INS_ADDHN:
+    case AARCH64_INS_ADDHN2:
+    case AARCH64_INS_RADDHN:
+    case AARCH64_INS_RADDHN2:
+    case AARCH64_INS_SUBHN:
+    case AARCH64_INS_SUBHN2:
+    case AARCH64_INS_RSUBHN:
+    case AARCH64_INS_RSUBHN2:
 
-    case AArch64_INS_SABA:
-    case AArch64_INS_UABA:
-    case AArch64_INS_SABAL:
-    case AArch64_INS_UABAL:
-    case AArch64_INS_SABAL2:
-    case AArch64_INS_UABAL2:
-    case AArch64_INS_SABD:
-    case AArch64_INS_UABD:
-    case AArch64_INS_SABDL:
-    case AArch64_INS_UABDL:
-    case AArch64_INS_SABDL2:
-    case AArch64_INS_UABDL2:
-    case AArch64_INS_SADALP:
-    case AArch64_INS_UADALP:
-    case AArch64_INS_SADDL:
-    case AArch64_INS_UADDL:
-    case AArch64_INS_SADDL2:
-    case AArch64_INS_UADDL2:
-    case AArch64_INS_SADDLP:
-    case AArch64_INS_UADDLP:
-    case AArch64_INS_SADDLV:
-    case AArch64_INS_UADDLV:
-    case AArch64_INS_SADDW:
-    case AArch64_INS_UADDW:
-    case AArch64_INS_SADDW2:
-    case AArch64_INS_UADDW2:
-    case AArch64_INS_SHSUB:
-    case AArch64_INS_UHSUB:
-    case AArch64_INS_SQABS:
-    case AArch64_INS_SQADD:
-    case AArch64_INS_UQADD:
-    case AArch64_INS_SQNEG:
-    case AArch64_INS_SQSUB:
-    case AArch64_INS_UQSUB:
-    case AArch64_INS_SQXTN:
-    case AArch64_INS_UQXTN:
-    case AArch64_INS_SQXTN2:
-    case AArch64_INS_UQXTN2:
-    case AArch64_INS_SQXTUN:
-    case AArch64_INS_SQXTUN2:
-    case AArch64_INS_SHADD:
-    case AArch64_INS_UHADD:
-    case AArch64_INS_SRHADD:
-    case AArch64_INS_URHADD:
-    case AArch64_INS_SSUBL:
-    case AArch64_INS_USUBL:
-    case AArch64_INS_SSUBL2:
-    case AArch64_INS_USUBL2:
-    case AArch64_INS_SSUBW:
-    case AArch64_INS_USUBW:
-    case AArch64_INS_SSUBW2:
-    case AArch64_INS_SUQADD:
-    case AArch64_INS_USQADD:
+    case AARCH64_INS_SABA:
+    case AARCH64_INS_UABA:
+    case AARCH64_INS_SABAL:
+    case AARCH64_INS_UABAL:
+    case AARCH64_INS_SABAL2:
+    case AARCH64_INS_UABAL2:
+    case AARCH64_INS_SABD:
+    case AARCH64_INS_UABD:
+    case AARCH64_INS_SABDL:
+    case AARCH64_INS_UABDL:
+    case AARCH64_INS_SABDL2:
+    case AARCH64_INS_UABDL2:
+    case AARCH64_INS_SADALP:
+    case AARCH64_INS_UADALP:
+    case AARCH64_INS_SADDL:
+    case AARCH64_INS_UADDL:
+    case AARCH64_INS_SADDL2:
+    case AARCH64_INS_UADDL2:
+    case AARCH64_INS_SADDLP:
+    case AARCH64_INS_UADDLP:
+    case AARCH64_INS_SADDLV:
+    case AARCH64_INS_UADDLV:
+    case AARCH64_INS_SADDW:
+    case AARCH64_INS_UADDW:
+    case AARCH64_INS_SADDW2:
+    case AARCH64_INS_UADDW2:
+    case AARCH64_INS_SHSUB:
+    case AARCH64_INS_UHSUB:
+    case AARCH64_INS_SQABS:
+    case AARCH64_INS_SQADD:
+    case AARCH64_INS_UQADD:
+    case AARCH64_INS_SQNEG:
+    case AARCH64_INS_SQSUB:
+    case AARCH64_INS_UQSUB:
+    case AARCH64_INS_SQXTN:
+    case AARCH64_INS_UQXTN:
+    case AARCH64_INS_SQXTN2:
+    case AARCH64_INS_UQXTN2:
+    case AARCH64_INS_SQXTUN:
+    case AARCH64_INS_SQXTUN2:
+    case AARCH64_INS_SHADD:
+    case AARCH64_INS_UHADD:
+    case AARCH64_INS_SRHADD:
+    case AARCH64_INS_URHADD:
+    case AARCH64_INS_SSUBL:
+    case AARCH64_INS_USUBL:
+    case AARCH64_INS_SSUBL2:
+    case AARCH64_INS_USUBL2:
+    case AARCH64_INS_SSUBW:
+    case AARCH64_INS_USUBW:
+    case AARCH64_INS_SSUBW2:
+    case AARCH64_INS_SUQADD:
+    case AARCH64_INS_USQADD:
 
-    case AArch64_INS_CMEQ:
-    case AArch64_INS_CMGE:
-    case AArch64_INS_CMGT:
-    case AArch64_INS_CMHI:
-    case AArch64_INS_CMHS:
-    case AArch64_INS_CMLA:
-    case AArch64_INS_CMLE:
-    case AArch64_INS_CMLT:
-    case AArch64_INS_CMTST:
-    case AArch64_INS_SMIN:
-    case AArch64_INS_SMINP:
-    case AArch64_INS_SMINV:
-    case AArch64_INS_UMIN:
-    case AArch64_INS_UMINP:
-    case AArch64_INS_UMINV:
-    case AArch64_INS_SMAX:
-    case AArch64_INS_SMAXP:
-    case AArch64_INS_SMAXV:
-    case AArch64_INS_UMAX:
-    case AArch64_INS_UMAXP:
-    case AArch64_INS_UMAXV:
+    case AARCH64_INS_CMEQ:
+    case AARCH64_INS_CMGE:
+    case AARCH64_INS_CMGT:
+    case AARCH64_INS_CMHI:
+    case AARCH64_INS_CMHS:
+    case AARCH64_INS_CMLA:
+    case AARCH64_INS_CMLE:
+    case AARCH64_INS_CMLT:
+    case AARCH64_INS_CMTST:
+    case AARCH64_INS_SMIN:
+    case AARCH64_INS_SMINP:
+    case AARCH64_INS_SMINV:
+    case AARCH64_INS_UMIN:
+    case AARCH64_INS_UMINP:
+    case AARCH64_INS_UMINV:
+    case AARCH64_INS_SMAX:
+    case AARCH64_INS_SMAXP:
+    case AARCH64_INS_SMAXV:
+    case AARCH64_INS_UMAX:
+    case AARCH64_INS_UMAXP:
+    case AARCH64_INS_UMAXV:
 
-    case AArch64_INS_BIF:
-    case AArch64_INS_BIT:
-    case AArch64_INS_BSL:
+    case AARCH64_INS_BIF:
+    case AARCH64_INS_BIT:
+    case AARCH64_INS_BSL:
 
-    case AArch64_INS_CNT:
-    case AArch64_INS_EXT:
-    case AArch64_INS_REV64:
-    case AArch64_INS_SLI:
-    case AArch64_INS_SRI:
-    case AArch64_INS_TRN1:
-    case AArch64_INS_TRN2:
-    case AArch64_INS_UZP1:
-    case AArch64_INS_UZP2:
-    case AArch64_INS_ZIP1:
-    case AArch64_INS_ZIP2:
+    case AARCH64_INS_CNT:
+    case AARCH64_INS_EXT:
+    case AARCH64_INS_REV64:
+    case AARCH64_INS_SLI:
+    case AARCH64_INS_SRI:
+    case AARCH64_INS_TRN1:
+    case AARCH64_INS_TRN2:
+    case AARCH64_INS_UZP1:
+    case AARCH64_INS_UZP2:
+    case AARCH64_INS_ZIP1:
+    case AARCH64_INS_ZIP2:
 
-    case AArch64_INS_FMLS:
+    case AARCH64_INS_FMLS:
 
-    case AArch64_INS_DUP:
-    case AArch64_INS_MOVI:
-    case AArch64_INS_MVNI:
-    case AArch64_INS_TBL:
-    case AArch64_INS_TBX:
-    case AArch64_INS_XTN:
-    case AArch64_INS_XTN2:
-
-
-    case AArch64_INS_SHRN:
-    case AArch64_INS_SHRN2:
-    case AArch64_INS_RSHRN:
-    case AArch64_INS_RSHRN2:
-
-    case AArch64_INS_SHL:
-    case AArch64_INS_SHLL:
-    case AArch64_INS_SHLL2:
-
-    case AArch64_INS_SQRSHL:
-    case AArch64_INS_UQRSHL:
-
-    case AArch64_INS_SQSHRN:
-    case AArch64_INS_UQSHRN:
-    case AArch64_INS_SQSHRN2:
-    case AArch64_INS_UQSHRN2:
-    case AArch64_INS_SQRSHRN:
-    case AArch64_INS_UQRSHRN:
-    case AArch64_INS_SQRSHRN2:
-    case AArch64_INS_UQRSHRN2:
-
-    case AArch64_INS_SQSHRUN:
-    case AArch64_INS_SQSHRUN2:
-    case AArch64_INS_SQRSHRUN:
-    case AArch64_INS_SQRSHRUN2:
-
-    case AArch64_INS_SQSHL:
-    case AArch64_INS_UQSHL:
-    case AArch64_INS_SQSHLU:
-
-    case AArch64_INS_SSHL:
-    case AArch64_INS_SRSHL:
-    case AArch64_INS_SSHR:
-    case AArch64_INS_SRSHR:
-    case AArch64_INS_SSRA:
-    case AArch64_INS_SRSRA:
-    case AArch64_INS_USHL:
-    case AArch64_INS_URSHL:
-    case AArch64_INS_USHR:
-    case AArch64_INS_URSHR:
-    case AArch64_INS_USRA:
-    case AArch64_INS_URSRA:
+    case AARCH64_INS_DUP:
+    case AARCH64_INS_MOVI:
+    case AARCH64_INS_MVNI:
+    case AARCH64_INS_TBL:
+    case AARCH64_INS_TBX:
+    case AARCH64_INS_XTN:
+    case AARCH64_INS_XTN2:
 
 
-    case AArch64_INS_SSHLL:
-    case AArch64_INS_SSHLL2:
-    case AArch64_INS_USHLL:
-    case AArch64_INS_USHLL2:
+    case AARCH64_INS_SHRN:
+    case AARCH64_INS_SHRN2:
+    case AARCH64_INS_RSHRN:
+    case AARCH64_INS_RSHRN2:
 
-    case AArch64_INS_MLA:
-    case AArch64_INS_MLS:
+    case AARCH64_INS_SHL:
+    case AARCH64_INS_SHLL:
+    case AARCH64_INS_SHLL2:
 
-    case AArch64_INS_SMLAL:
-    case AArch64_INS_SMLSL:
-    case AArch64_INS_SMLAL2:
-    case AArch64_INS_SMLSL2:
-    case AArch64_INS_UMLAL:
-    case AArch64_INS_UMLSL:
-    case AArch64_INS_UMLAL2:
-    case AArch64_INS_UMLSL2:
-    case AArch64_INS_SMULL2:
-    case AArch64_INS_UMULL2:
+    case AARCH64_INS_SQRSHL:
+    case AARCH64_INS_UQRSHL:
 
-    case AArch64_INS_SQDMLAL:
-    case AArch64_INS_SQDMLSL:
-    case AArch64_INS_SQDMLAL2:
-    case AArch64_INS_SQDMLSL2:
-    case AArch64_INS_SQDMULL2:
-    case AArch64_INS_SQRDMLAH:
-    case AArch64_INS_SQRDMLSH:
+    case AARCH64_INS_SQSHRN:
+    case AARCH64_INS_UQSHRN:
+    case AARCH64_INS_SQSHRN2:
+    case AARCH64_INS_UQSHRN2:
+    case AARCH64_INS_SQRSHRN:
+    case AARCH64_INS_UQRSHRN:
+    case AARCH64_INS_SQRSHRN2:
+    case AARCH64_INS_UQRSHRN2:
 
-    case AArch64_INS_SQDMULH:
-    case AArch64_INS_SQRDMULH:
+    case AARCH64_INS_SQSHRUN:
+    case AARCH64_INS_SQSHRUN2:
+    case AARCH64_INS_SQRSHRUN:
+    case AARCH64_INS_SQRSHRUN2:
+
+    case AARCH64_INS_SQSHL:
+    case AARCH64_INS_UQSHL:
+    case AARCH64_INS_SQSHLU:
+
+    case AARCH64_INS_SSHL:
+    case AARCH64_INS_SRSHL:
+    case AARCH64_INS_SSHR:
+    case AARCH64_INS_SRSHR:
+    case AARCH64_INS_SSRA:
+    case AARCH64_INS_SRSRA:
+    case AARCH64_INS_USHL:
+    case AARCH64_INS_URSHL:
+    case AARCH64_INS_USHR:
+    case AARCH64_INS_URSHR:
+    case AARCH64_INS_USRA:
+    case AARCH64_INS_URSRA:
+
+
+    case AARCH64_INS_SSHLL:
+    case AARCH64_INS_SSHLL2:
+    case AARCH64_INS_USHLL:
+    case AARCH64_INS_USHLL2:
+
+    case AARCH64_INS_MLA:
+    case AARCH64_INS_MLS:
+
+    case AARCH64_INS_SMLAL:
+    case AARCH64_INS_SMLSL:
+    case AARCH64_INS_SMLAL2:
+    case AARCH64_INS_SMLSL2:
+    case AARCH64_INS_UMLAL:
+    case AARCH64_INS_UMLSL:
+    case AARCH64_INS_UMLAL2:
+    case AARCH64_INS_UMLSL2:
+    case AARCH64_INS_SMULL2:
+    case AARCH64_INS_UMULL2:
+
+    case AARCH64_INS_SQDMLAL:
+    case AARCH64_INS_SQDMLSL:
+    case AARCH64_INS_SQDMLAL2:
+    case AARCH64_INS_SQDMLSL2:
+    case AARCH64_INS_SQDMULL2:
+    case AARCH64_INS_SQRDMLAH:
+    case AARCH64_INS_SQRDMLSH:
+
+    case AARCH64_INS_SQDMULH:
+    case AARCH64_INS_SQRDMULH:
 
         g_assert(first_op_isfr);
         return INST_FP_ARITH;
 
-    case AArch64_INS_BFCVT:
-    case AArch64_INS_FCVT:
-    case AArch64_INS_FCVTL:
-    case AArch64_INS_FCVTL2:
-    case AArch64_INS_FCVTN:
-    case AArch64_INS_FCVTN2:
-    case AArch64_INS_FCVTXN:
-    case AArch64_INS_FCVTXN2:
-    case AArch64_INS_FCVTAS:
-    case AArch64_INS_FCVTMS:
-    case AArch64_INS_FCVTNS:
-    case AArch64_INS_FCVTPS:
-    case AArch64_INS_FCVTZS:
-    case AArch64_INS_FCVTAU:
-    case AArch64_INS_FCVTMU:
-    case AArch64_INS_FCVTNU:
-    case AArch64_INS_FCVTPU:
-    case AArch64_INS_FCVTZU:
+    case AARCH64_INS_BFCVT:
+    case AARCH64_INS_FCVT:
+    case AARCH64_INS_FCVTL:
+    case AARCH64_INS_FCVTL2:
+    case AARCH64_INS_FCVTN:
+    case AARCH64_INS_FCVTN2:
+    case AARCH64_INS_FCVTXN:
+    case AARCH64_INS_FCVTXN2:
+    case AARCH64_INS_FCVTAS:
+    case AARCH64_INS_FCVTMS:
+    case AARCH64_INS_FCVTNS:
+    case AARCH64_INS_FCVTPS:
+    case AARCH64_INS_FCVTZS:
+    case AARCH64_INS_FCVTAU:
+    case AARCH64_INS_FCVTMU:
+    case AARCH64_INS_FCVTNU:
+    case AARCH64_INS_FCVTPU:
+    case AARCH64_INS_FCVTZU:
         return INST_FP_ARITH;
     
-    case AArch64_INS_FMOV:
+    case AARCH64_INS_FMOV:
         if (first_op_isfr && second_op_isfr) {
             return INST_FP_ARITH;
         } else {
@@ -1010,7 +1010,7 @@ int aarch64_get_insn_cat(const cs_insn * insn) {
     default:
         break;
     }
-    if (insn->id == AArch64_INS_MOV) {
+    if (insn->id == AARCH64_INS_MOV) {
         if (insn->detail->aarch64.op_count == 2) {
             if (first_op_isfr && aarch64_op_is_fr(&insn->detail->aarch64.operands[1])) {
                 return INST_FP_ARITH; 
@@ -1024,7 +1024,7 @@ int aarch64_get_insn_cat(const cs_insn * insn) {
         }
     }
 
-    if (insn->alias_id == AArch64_INS_ALIAS_MOV) {
+    if (insn->alias_id == AARCH64_INS_ALIAS_MOV) {
         if (insn->detail->aarch64.op_count == 2) {
             if (first_op_isfr) {
                 if (aarch64_op_is_fr(&insn->detail->aarch64.operands[1])) {
@@ -1036,18 +1036,18 @@ int aarch64_get_insn_cat(const cs_insn * insn) {
         }
     }
 
-    if (insn->id == AArch64_INS_MRS) {
+    if (insn->id == AARCH64_INS_MRS) {
         if (insn->detail->aarch64.op_count == 2) {
             if (
                 first_op_isgr &&
-                (insn->detail->aarch64.operands[1].type == AArch64_OP_SYSREG && insn->detail->aarch64.operands[1].sysop.sub_type == AArch64_OP_REG_MRS)
+                (insn->detail->aarch64.operands[1].type == AARCH64_OP_SYSREG && insn->detail->aarch64.operands[1].sysop.sub_type == AARCH64_OP_REG_MRS)
             ) {
                 int r = insn->detail->aarch64.operands[1].sysop.reg.sysreg;
                 if (
-                    r == AArch64_SYSREG_TPIDR_EL0 ||
-                    r == AArch64_SYSREG_FPCR ||
-                    r == AArch64_SYSREG_MIDR_EL1 ||
-                    r == AArch64_SYSREG_DCZID_EL0
+                    r == AARCH64_SYSREG_TPIDR_EL0 ||
+                    r == AARCH64_SYSREG_FPCR ||
+                    r == AARCH64_SYSREG_MIDR_EL1 ||
+                    r == AARCH64_SYSREG_DCZID_EL0
                 ) {
                     return INST_OTHER; 
                 }
@@ -1084,7 +1084,7 @@ int riscv64_insn_is_branch(const cs_insn * insn) {
 
 
 target_info all_archs[] = {
-    { "aarch64",   CS_ARCH_AARCH64, cs_mode(CS_MODE_LITTLE_ENDIAN)                    , AArch64_INS_ENDING, aarch64_get_insn_cat},
+    { "aarch64",   CS_ARCH_AARCH64, cs_mode(CS_MODE_LITTLE_ENDIAN)                    , AARCH64_INS_ENDING, aarch64_get_insn_cat},
     { "mips64el",  CS_ARCH_MIPS,    cs_mode(CS_MODE_MIPS64 | CS_MODE_LITTLE_ENDIAN)   , MIPS_INS_ENDING , },
     { "mips64",    CS_ARCH_MIPS,    cs_mode(CS_MODE_MIPS64 | CS_MODE_BIG_ENDIAN)      , MIPS_INS_ENDING , },
     { "i386",      CS_ARCH_X86,     cs_mode(CS_MODE_32)                               , X86_INS_ENDING  , },
