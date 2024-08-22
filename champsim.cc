@@ -181,6 +181,31 @@ int riscv64_insn_is_branch(const cs_insn * insn) {
     return 0;
 }
 
+int loongarch64_insn_is_branch(const cs_insn * insn) {
+    switch (insn->id)
+    {
+    case LOONGARCH_INS_B:
+    case LOONGARCH_INS_BL:
+    case LOONGARCH_INS_BEQ:
+    case LOONGARCH_INS_BEQZ:
+    case LOONGARCH_INS_BGE:
+    case LOONGARCH_INS_BGEU:
+    case LOONGARCH_INS_BLT:
+    case LOONGARCH_INS_BLTU:
+    case LOONGARCH_INS_BNE:
+    case LOONGARCH_INS_BNEZ:
+    case LOONGARCH_INS_BCEQZ:
+    case LOONGARCH_INS_BCNEZ:
+    case LOONGARCH_INS_JIRL:
+    case LOONGARCH_INS_JISCR0:
+    case LOONGARCH_INS_JISCR1:
+        return 1;
+    default:
+        return 0;
+    }
+    return 0;
+}
+
 struct target_info{
     const char *name;
     cs_arch arch;
@@ -199,6 +224,8 @@ target_info all_archs[] = {
     { "x86_64",    CS_ARCH_X86,   cs_mode(CS_MODE_64)                               , X86_INS_ENDING  , x64_insn_is_branch},
     { "riscv32",   CS_ARCH_RISCV, cs_mode(CS_MODE_RISCV32 | CS_MODE_RISCVC)         , RISCV_INS_ENDING},
     { "riscv64",   CS_ARCH_RISCV, cs_mode(CS_MODE_RISCV64 | CS_MODE_RISCVC)         , RISCV_INS_ENDING, riscv64_insn_is_branch},
+    { "loongarch32",   CS_ARCH_LOONGARCH,   cs_mode(CS_MODE_LOONGARCH32)              , LOONGARCH_INS_ENDING, },
+    { "loongarch64",   CS_ARCH_LOONGARCH,   cs_mode(CS_MODE_LOONGARCH64)              , LOONGARCH_INS_ENDING, loongarch64_insn_is_branch},
     { NULL }
 };
 
