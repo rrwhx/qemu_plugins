@@ -54,16 +54,35 @@ void plugin_exit(qemu_plugin_id_t id, void *p) {
 //     xyprintf("[unknown] %16lx: id:%d %x %-15s%s\n",  insn->address, insn->id, *(int*)(insn->bytes), insn->mnemonic, insn->op_str);
 // }
 
+#if QEMU_PLUGIN_VERSION != 2
+static void tb_exec_dummy_inline(unsigned int cpu_index, void *udata)
+{
+    ++ *(uint64_t*)udata;
+}
+#endif
+
 static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
 {
     size_t insns = qemu_plugin_tb_n_insns(tb);
 
     for (size_t i = 0; i < insns; i ++) {
         struct qemu_plugin_insn *insn = qemu_plugin_tb_get_insn(tb, i);
-        const uint32_t* data = (uint32_t*)qemu_plugin_insn_data(insn);
+#if QEMU_PLUGIN_VERSION == 2
+            const uint8_t* data = (uint8_t*)qemu_plugin_insn_data(insn);
+#else
+            uint32_t insn_binary;
+            if (qemu_plugin_insn_data(insn, &insn_binary, 4) != 4) {
+                fprintf(stderr, "lxy:%s:%s:%d qemu_plugin_insn_data failed\n", __FILE__,__func__,__LINE__);
+            }
+            const uint8_t* data = (uint8_t*)&insn_binary;
+#endif
         LA_DECODE la_decode = {};
         decode(&la_decode, *data);
+#if QEMU_PLUGIN_VERSION == 2
         qemu_plugin_register_vcpu_insn_exec_inline(insn, QEMU_PLUGIN_INLINE_ADD_U64, (void*)&cat_count[la_decode.id], 1);
+#else
+        qemu_plugin_register_vcpu_tb_exec_cb(tb, tb_exec_dummy_inline, QEMU_PLUGIN_CB_NO_REGS, (void*)&cat_count[la_decode.id]);
+#endif
     }
 }
 

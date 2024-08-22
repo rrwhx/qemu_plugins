@@ -96,6 +96,13 @@ static void tb_exec(unsigned int cpu_index, void *udata)
     }
 }
 
+#if QEMU_PLUGIN_VERSION != 2
+static void tb_exec_dummy_inline(unsigned int cpu_index, void *udata)
+{
+    icount += (uint64_t)udata;
+}
+#endif
+
 static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
 {
     uint64_t pc    = qemu_plugin_tb_vaddr(tb);
@@ -111,7 +118,11 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
         fprintf(pc_info_file, "id:%ld, pc:%lx, bb_insn_num:%ld\n", t.id, pc, t.bbicount);
     }
     udata = (void*)&(pc_id_count[pc].count);
+#if QEMU_PLUGIN_VERSION == 2
     qemu_plugin_register_vcpu_tb_exec_inline(tb, QEMU_PLUGIN_INLINE_ADD_U64, &icount, insns);
+#else
+    qemu_plugin_register_vcpu_tb_exec_cb(tb, tb_exec_dummy_inline, QEMU_PLUGIN_CB_NO_REGS, (void*)insns);
+#endif
     qemu_plugin_register_vcpu_tb_exec_cb(tb, tb_exec, QEMU_PLUGIN_CB_NO_REGS, udata);
 }
 

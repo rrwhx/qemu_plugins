@@ -1128,6 +1128,13 @@ void plugin_exit(qemu_plugin_id_t id, void *p) {
 //     xyprintf("[unknown] %16lx: id:%d %x %-15s%s\n",  insn->address, insn->id, *(int*)(insn->bytes), insn->mnemonic, insn->op_str);
 // }
 
+#if QEMU_PLUGIN_VERSION != 2
+static void tb_exec_dummy_inline(unsigned int cpu_index, void *udata)
+{
+    ++ *(uint64_t*)udata;
+}
+#endif
+
 static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
 {
     size_t insns = qemu_plugin_tb_n_insns(tb);
@@ -1135,7 +1142,14 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
     for (size_t i = 0; i < insns; i ++) {
         struct qemu_plugin_insn *insn = qemu_plugin_tb_get_insn(tb, i);
         int size = qemu_plugin_insn_size(insn);
-        const uint8_t* data = (uint8_t*)qemu_plugin_insn_data(insn);
+#if QEMU_PLUGIN_VERSION == 2
+            const uint8_t* data = (uint8_t*)qemu_plugin_insn_data(insn);
+#else
+            uint8_t data[16];
+            if (qemu_plugin_insn_data(insn, &data, size) != size) {
+                fprintf(stderr, "lxy:%s:%s:%d qemu_plugin_insn_data failed\n", __FILE__,__func__,__LINE__);
+            }
+#endif
         uint64_t addr = qemu_plugin_insn_vaddr(insn);
         cs_insn *cs_insn;
         size_t count = cs_disasm(cs_handle, (const uint8_t*)data, size, addr, 1, &cs_insn);
@@ -1149,7 +1163,11 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
                 //                                 (void*)cs_insn);
                 // }
                 // xyprintf("%16lx: %-15s%s\n", addr, cs_insn[j].mnemonic, cs_insn[j].op_str);
+#if QEMU_PLUGIN_VERSION == 2
                 qemu_plugin_register_vcpu_insn_exec_inline(insn,QEMU_PLUGIN_INLINE_ADD_U64, (void*)&cat_count[target->get_insn_cat(cs_insn)], 1);
+#else
+                qemu_plugin_register_vcpu_tb_exec_cb(tb, tb_exec_dummy_inline, QEMU_PLUGIN_CB_NO_REGS, (void*)&cat_count[target->get_insn_cat(cs_insn)]);
+#endif
             }
             cs_free(cs_insn, count);
         } else {

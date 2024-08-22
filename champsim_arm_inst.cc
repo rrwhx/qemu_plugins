@@ -132,7 +132,7 @@ int x64_insn_is_branch(const cs_insn * insn) {
     return 0;
 }
 
-int aarch64_insn_is_branch(const cs_insn * insn) {
+int AARCH64_INSn_is_branch(const cs_insn * insn) {
     uint32_t code = *(uint32_t*)insn->bytes;
     if (code >> 26 == 5) {
         return BRANCH_DIRECT_JUMP;
@@ -194,7 +194,7 @@ struct target_info{
 
 
 target_info all_archs[] = {
-    { "aarch64",   CS_ARCH_AARCH64, cs_mode(CS_MODE_LITTLE_ENDIAN)                  , AARCH64_INS_ENDING, aarch64_insn_is_branch},
+    { "aarch64",   CS_ARCH_AARCH64, cs_mode(CS_MODE_LITTLE_ENDIAN)                  , AARCH64_INS_ENDING, AARCH64_INSn_is_branch},
     { "mips64el",  CS_ARCH_MIPS,  cs_mode(CS_MODE_MIPS64 | CS_MODE_LITTLE_ENDIAN)   , MIPS_INS_ENDING , },
     { "mips64",    CS_ARCH_MIPS,  cs_mode(CS_MODE_MIPS64 | CS_MODE_BIG_ENDIAN)      , MIPS_INS_ENDING , },
     { "i386",      CS_ARCH_X86,   cs_mode(CS_MODE_32)                               , X86_INS_ENDING  , },
@@ -406,7 +406,15 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb* tb) {
     for (size_t i = 0; i < insns; i++) {
         struct qemu_plugin_insn* insn = qemu_plugin_tb_get_insn(tb, i);
         uint64_t addr = qemu_plugin_insn_vaddr(insn);
-        const uint8_t* data = (uint8_t*)qemu_plugin_insn_data(insn);
+#if QEMU_PLUGIN_VERSION == 2
+            const uint8_t* data = (uint8_t*)qemu_plugin_insn_data(insn);
+#else
+            uint32_t insn_binary;
+            if (qemu_plugin_insn_data(insn, &insn_binary, 4) != 4) {
+                fprintf(stderr, "lxy:%s:%s:%d qemu_plugin_insn_data failed\n", __FILE__,__func__,__LINE__);
+            }
+            const uint8_t* data = (uint8_t*)&insn_binary;
+#endif
         if (*(uint32_t*)data == 0x2200) {
             fprintf(stderr, "-----------CHAMPSIM TRACE BEGIN-----------\n");
             switch_on = 1;

@@ -82,7 +82,16 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
     for (size_t i = 0; i < insns; i ++) {
         struct qemu_plugin_insn *insn = qemu_plugin_tb_get_insn(tb, i);
         insn_list.push_back(insn);
-        insn_code_list.push_back(*(uint32_t*)qemu_plugin_insn_data(insn));
+        uint32_t insn_code;
+#if QEMU_PLUGIN_VERSION == 2
+            const uint32_t* data = (uint32_t*)qemu_plugin_insn_data(insn);
+            insn_code = *data;
+#else
+            if (qemu_plugin_insn_data(insn, &insn_code, 4) != 4) {
+                fprintf(stderr, "lxy:%s:%s:%d qemu_plugin_insn_data failed\n", __FILE__,__func__,__LINE__);
+            }
+#endif
+        insn_code_list.push_back(insn_code);
         // int size = qemu_plugin_insn_size(insn);
     }
     BlockInfo *bi = g_new0(BlockInfo, 1);

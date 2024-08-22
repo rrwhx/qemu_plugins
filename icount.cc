@@ -44,17 +44,25 @@ static void tb_record_insn_cb(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
 }
 
 static void tb_record_insn_inline(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
+#if QEMU_PLUGIN_VERSION == 2
     size_t insns = qemu_plugin_tb_n_insns(tb);
     for (size_t i = 0; i < insns; i ++) {
         qemu_plugin_register_vcpu_tb_exec_inline(tb,QEMU_PLUGIN_INLINE_ADD_U64, (void*)&icount, 1);
     }
+#else
+    fprintf(stderr, "lxy:%s:%s:%d not supported\n", __FILE__,__func__,__LINE__);
+#endif
 }
 
 static void tb_record_tb_cb(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
     qemu_plugin_register_vcpu_tb_exec_cb(tb, vcpu_tb_exec, QEMU_PLUGIN_CB_NO_REGS, (void*)qemu_plugin_tb_n_insns(tb));
 }
 static void tb_record_tb_inline(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
+#if QEMU_PLUGIN_VERSION == 2
     qemu_plugin_register_vcpu_tb_exec_inline(tb,QEMU_PLUGIN_INLINE_ADD_U64, (void*)&icount, qemu_plugin_tb_n_insns(tb));
+#else
+    fprintf(stderr, "lxy:%s:%s:%d not supported\n", __FILE__,__func__,__LINE__);
+#endif
 }
 
 QEMU_PLUGIN_EXPORT

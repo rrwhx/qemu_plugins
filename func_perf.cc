@@ -59,6 +59,12 @@ void plugin_exit(qemu_plugin_id_t id, void *p) {
     sort(func_info);
 }
 
+#if QEMU_PLUGIN_VERSION != 2
+static void tb_exec_dummy_inline(unsigned int cpu_index, void *udata)
+{
+    ++ *(uint64_t*)udata;
+}
+#endif
 
 static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
 {
@@ -74,7 +80,11 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
         func_info[ss] = 0;
     }
 
+#if QEMU_PLUGIN_VERSION == 2
     qemu_plugin_register_vcpu_tb_exec_inline(tb,QEMU_PLUGIN_INLINE_ADD_U64, &func_info[ss], insns);
+#else
+    qemu_plugin_register_vcpu_tb_exec_cb(tb, tb_exec_dummy_inline, QEMU_PLUGIN_CB_NO_REGS, (void*)&func_info[ss]);
+#endif
 }
 
 QEMU_PLUGIN_EXPORT

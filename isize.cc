@@ -45,6 +45,12 @@ void plugin_exit(qemu_plugin_id_t id, void *p) {
     fprintf(stderr, "%ld, %ld, %.3f\n", icount, icount_size, (double)icount_size / icount);
 }
 
+#if QEMU_PLUGIN_VERSION != 2
+static void tb_exec_dummy_inline(unsigned int cpu_index, void *udata)
+{
+    ++ *(uint64_t*)udata;
+}
+#endif
 
 static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
 {
@@ -53,14 +59,18 @@ static void tb_record(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)
         struct qemu_plugin_insn *insn = qemu_plugin_tb_get_insn(tb, i);
         size_t size = qemu_plugin_insn_size(insn);
         if (size <= INSN_SIZE_MAX) {
+#if QEMU_PLUGIN_VERSION == 2
             qemu_plugin_register_vcpu_tb_exec_inline(tb,QEMU_PLUGIN_INLINE_ADD_U64, (void*)(insn_size_info + size - 1), 1);
+#else
+            qemu_plugin_register_vcpu_tb_exec_cb(tb, tb_exec_dummy_inline, QEMU_PLUGIN_CB_NO_REGS, (void*)(insn_size_info + size - 1));
+#endif
         } else {
             uint64_t addr = qemu_plugin_insn_vaddr(insn);
-            const char* insn_data = (char*)qemu_plugin_insn_data(insn);
+            // const char* insn_data = (char*)qemu_plugin_insn_data(insn);
             fprintf(stderr, "skip %lx \n", addr);
-            for (size_t i = 0; i < size; i++) {
-                fprintf(stderr, "%01x\n", insn_data[i]);
-            }
+            // for (size_t i = 0; i < size; i++) {
+            //     fprintf(stderr, "%01x\n", insn_data[i]);
+            // }
             fprintf(stderr, "\n");
         }
     }
